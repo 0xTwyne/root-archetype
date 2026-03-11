@@ -1,0 +1,11 @@
+{
+  "_doc": "Per-repo toolchain config for write-time linting and package manager enforcement. Add entries for each child repo.",
+  "_example": {
+    "package_manager": "uv",
+    "blocked_managers": ["pip", "pip3"],
+    "formatter": "uv run ruff format",
+    "formatter_check": "uv run ruff format --check",
+    "linter": "uv run ruff check",
+    "patterns": ["*.py"]
+  }
+}

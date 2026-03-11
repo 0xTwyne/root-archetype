@@ -1,0 +1,12 @@
+{
+  "_doc": "Two-level maintainer model. Global maintainers can modify any protected file. Scoped maintainers are restricted to their repos.",
+  "global": [
+    "your-email@example.com"
+  ],
+  "scopes": {
+    "{{PROJECT_NAME}}": {
+      "maintainers": ["your-email@example.com"],
+      "protected_paths": [".claude/", "CLAUDE.md", "SPEC.md", "scripts/", "docs/"]
+    }
+  }
+}

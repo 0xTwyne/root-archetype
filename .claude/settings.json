@@ -1,5 +1,27 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-start.sh",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-end.sh",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -16,6 +38,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash .claude/hooks/pre-edit-guard.sh",
+            "timeout": 5000
+          },
+          {
+            "type": "command",
             "command": "bash scripts/hooks/check_filesystem_path.sh",
             "timeout": 5000
           },
@@ -23,10 +50,48 @@
             "type": "command",
             "command": "bash scripts/hooks/agents_schema_guard.sh",
             "timeout": 5000
-          },
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/hooks/agents_reference_guard.sh",
+            "command": "bash .claude/hooks/post-tool-use-audit.sh",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-edit-check.sh",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/correction-detection.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/subagent-start.sh",
             "timeout": 5000
           }
         ]

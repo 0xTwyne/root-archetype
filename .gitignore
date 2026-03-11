@@ -17,5 +17,10 @@ swarm/*.db
 swarm/*.db-wal
 swarm/*.db-shm
 
+# Session state (local, gitignored)
+.session-identity
+.session-stats
+.push-logs.lock
+
 # Local settings
 .claude/settings.local.json

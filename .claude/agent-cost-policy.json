@@ -63,6 +63,38 @@
       "_doc": "Task-type:complexity routing. Level 1=simple, 2=moderate, 3=complex. Route cheap tasks to cheap models."
     }
   },
+  "subagent_model_routing": {
+    "_doc": "Map agent types to model tiers. Cheap models for read-only tasks, expensive for implementation.",
+    "explore": "haiku",
+    "plan": "sonnet",
+    "code_simplifier": "sonnet",
+    "refactor": "sonnet",
+    "research": "sonnet",
+    "implementation": "opus"
+  },
+  "subagent_max_turns": {
+    "_doc": "Explicit turn limits per agent type. Prevents runaway agents.",
+    "explore": 8,
+    "plan": 12,
+    "implementation": 20,
+    "bash": 3,
+    "research": 10
+  },
+  "session_budget_visibility": {
+    "enabled": true,
+    "_doc": "Inject session stats (tool calls, subagents, file mods) into every subagent prompt via SubagentStart hook. Helps agents self-regulate depth."
+  },
+  "facts_cache": {
+    "enabled": true,
+    "max_lines": 80,
+    "path_template": "notes/{{user}}/facts.md",
+    "_doc": "Per-user cross-session facts cache. Auto-injected at session start and post-compaction. Stores conventions, toolchain details, integration gotchas."
+  },
+  "nightshift_budget": {
+    "max_daily_percent": 75,
+    "reserve_percent": 10,
+    "_doc": "Reserve 10% of daily budget for interactive use. Nightshift consumes at most 75%."
+  },
   "swarm_budget": {
     "enabled": true,
     "per_agent_usd": 2.00,
