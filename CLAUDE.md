@@ -25,10 +25,10 @@ Pre/post tool-use hooks for Claude Code sessions:
 - Test safety (`check_test_safety.sh`)
 
 ### Validators (`scripts/validate/`)
-- Agent structure validation
-- CLAUDE.md matrix consistency
-- Document drift detection
-- Reference integrity
+- Agent structure validation (`validate_agents_structure.py`)
+- Reference integrity (`validate_agents_references.py`)
+- CLAUDE.md matrix consistency (planned — see Issue #1)
+- Document drift detection (planned — see Issue #1)
 
 ### Agent System (`agents/`)
 Thin-map architecture:

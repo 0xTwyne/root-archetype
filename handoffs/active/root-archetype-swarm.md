@@ -11,7 +11,7 @@ Created the `root-archetype` repository — a project-agnostic template for seed
 - **Location**: `/mnt/raid0/llm/root-archetype`
 - **GitHub**: https://github.com/pestopoppa/root-archetype
 - **Commits**: 4 (initial scaffold + cost policy + twyne-root port + contamination fix)
-- **Files**: 52 files, ~4400 LOC
+- **Files**: 64 files, ~5000 LOC
 
 ## What's Built
 
@@ -25,13 +25,13 @@ Created the `root-archetype` repository — a project-agnostic template for seed
 - Cost optimization policy (model tier routing, context compaction, budget controls)
 
 ### Swarm Coordination Primitive
-- **Coordinator** (`swarm/coordinator.py`, ~500 LOC): SQLite-backed with WAL mode
+- **Coordinator** (`swarm/coordinator.py`, ~640 LOC): SQLite-backed with WAL mode
   - Agent registration + heartbeat + stale-claim release
   - Priority work queue (not FIFO)
   - Message board (channels + threaded posts)
   - Resource locks with TTL
   - Budget enforcement per agent with ledger
-- **Experiment Scheduler** (`swarm/scheduler.py`, ~300 LOC):
+- **Experiment Scheduler** (`swarm/scheduler.py`, ~340 LOC):
   - ParetoArchive with hypervolume tracking (2D exact, >2D Monte Carlo)
   - Expected Improvement scoring: frontier distance, novelty, species diversity, uncertainty
   - Re-scores all pending experiments after each validation
@@ -78,6 +78,26 @@ Created the `root-archetype` repository — a project-agnostic template for seed
 - Direct-to-main push for logs/notes (worktree-based, no PR friction)
 - Cost optimization: subagent model routing, max_turns per type, budget visibility, facts cache
 
+## Known Issues / Implementation Debt
+
+**Dead code:**
+- `budget_ledger` table in coordinator.py: inserted into but never queried
+- `_submitted_items` list in client.py: appended to but never read
+
+**Concurrency:**
+- Lock race condition in `acquire_lock()` — doesn't use `BEGIN IMMEDIATE`
+- `select_next()` not thread-safe — two callers can select same item
+
+**Scaling:**
+- Objective scoring not normalized in scheduler — `frontier_distance` can have arbitrary magnitude vs [0,1] bounded components
+
+**Stubs:**
+- Nightshift sequential mode (run_wrapper.sh:95) — TODO only
+- Nightshift worker launch (run_wrapper.sh:154) — TODO only
+
+**Documentation drift:**
+- CLAUDE.md listed 4 validators, only 2 exist (fixed 2026-03-14)
+
 ## Contamination Audit — PASSED
 
 Full audit found 7 instances of project-specific material. All fixed in commit `06e1b31`:
@@ -89,13 +109,13 @@ Full audit found 7 instances of project-specific material. All fixed in commit `
 
 Post-fix verification: `grep -ri 'epyc\|twyne\|llama\|Qwen\|Q4_K\|orchestrator\|/mnt/raid0'` returns zero matches.
 
-## Remaining Work
+## Remaining Work (Prioritized)
 
-See GitHub issues for detailed checklists. Key gaps:
-- No tests yet for swarm coordinator
-- Nightshift worker launch is stubbed (needs Claude Code session spawning)
-- AutoPilot integration is design-only (issue #3)
-- Some twyne-root patterns still TODO: devcontainer setup, plan persistence hook, progress report auto-generation
+| Priority | Scope | Items |
+|----------|-------|-------|
+| P1: Correctness | Issue #2 | Fix lock race, normalize scoring, remove dead code, add tests |
+| P2: Governance | Issue #1 | 2 missing validators, numeric literals, recovery scripts, commands/skills, post-init validation |
+| P3: Integration | Issues #3-4 | Nightshift worker launch, AutoPilot swarm consumer, devcontainer |
 
 ## Next Session
 
