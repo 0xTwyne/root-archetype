@@ -16,6 +16,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from swarm.constants import (
+    DEFAULT_AGENT_BUDGET,
+    DEFAULT_HEARTBEAT_INTERVAL,
+    DEFAULT_MESSAGE_LIMIT,
+    MAX_PENDING_SCAN,
+)
 from swarm.coordinator import (
     Coordinator, WorkItem, WorkItemStatus, Message, ResourceLock, Agent,
 )
@@ -29,8 +35,8 @@ class SwarmClient:
         coordinator: Coordinator,
         name: str,
         role: str,
-        budget: float = 100.0,
-        heartbeat_interval: float = 30.0,
+        budget: float = DEFAULT_AGENT_BUDGET,
+        heartbeat_interval: float = DEFAULT_HEARTBEAT_INTERVAL,
     ):
         self.coordinator = coordinator
         self.name = name
@@ -40,7 +46,6 @@ class SwarmClient:
         self._heartbeat_thread: threading.Thread | None = None
         self._running = False
         self._held_locks: set[str] = set()
-        self._submitted_items: list[str] = []
 
     # ---- Lifecycle ----
 
@@ -106,7 +111,6 @@ class SwarmClient:
             parent_item_id=parent_item_id,
             metadata=metadata,
         )
-        self._submitted_items.append(item_id)
         return item_id
 
     def claim_work(self) -> WorkItem | None:
@@ -135,7 +139,7 @@ class SwarmClient:
 
     def list_my_items(self) -> list[WorkItem]:
         """List work items created by this agent."""
-        all_items = self.coordinator.list_work(limit=500)
+        all_items = self.coordinator.list_work(limit=MAX_PENDING_SCAN)
         return [item for item in all_items if item.created_by == self.agent_id]
 
     # ---- Message Board ----
@@ -150,7 +154,7 @@ class SwarmClient:
         )
 
     def read_messages(
-        self, channel: str, since: float = 0, limit: int = 100
+        self, channel: str, since: float = 0, limit: int = DEFAULT_MESSAGE_LIMIT
     ) -> list[Message]:
         """Read messages from a channel."""
         return self.coordinator.get_messages(channel, since, limit)

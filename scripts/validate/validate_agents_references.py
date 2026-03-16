@@ -14,6 +14,41 @@ def find_references(content: str) -> list[str]:
     refs.extend(re.findall(r'\[[^\]]*\]\(([^)]+\.(?:md|sh|py|json|yaml|yml))\)', content))
     return refs
 
+# Known parent directories for basename-style references in documentation.
+# When a ref is a bare filename, also check under these directories.
+_BASENAME_SEARCH_DIRS = [
+    "scripts/hooks",
+    "scripts/validate",
+    "scripts/utils",
+    "scripts/session",
+    "scripts/repos",
+    ".claude/commands",
+    ".claude/skills",
+    "agents/shared",
+    "agents",
+]
+
+
+def _is_non_path_ref(ref: str) -> bool:
+    """Return True if ref is not a resolvable filesystem path."""
+    # Template patterns (YYYY-MM, {{VAR}})
+    if "YYYY" in ref or "{{" in ref:
+        return True
+    # Home-dir paths
+    if ref.startswith("~"):
+        return True
+    # Glob patterns
+    if "*" in ref:
+        return True
+    # Inline code with spaces (commands, not paths)
+    if " " in ref:
+        return True
+    # Instructional placeholders (e.g. "your-role.md", "my-app")
+    if "your-" in ref or "my-" in ref or "example" in ref.lower():
+        return True
+    return False
+
+
 def validate():
     repo_root = Path(__file__).resolve().parent.parent.parent
     scan_patterns = [
@@ -29,11 +64,21 @@ def validate():
             continue
         content = f.read_text()
         for ref in find_references(content):
-            if ref.startswith("http://") or ref.startswith("https://"):
+            if ref.startswith(("http://", "https://")):
                 continue
-            # Try relative to file, then repo root
+            if _is_non_path_ref(ref):
+                continue
+            # Try: relative to file, repo root, and basename search dirs
             resolved = f.parent / ref
-            if not resolved.exists() and not (repo_root / ref).exists():
+            if resolved.exists() or (repo_root / ref).exists():
+                continue
+            # Basename fallback — check known parent directories
+            basename = Path(ref).name
+            found = any(
+                (repo_root / d / basename).exists()
+                for d in _BASENAME_SEARCH_DIRS
+            )
+            if not found:
                 broken.append((f.name, ref))
 
     if broken:

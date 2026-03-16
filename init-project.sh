@@ -78,6 +78,7 @@ mkdir -p .claude/{commands,skills/swarm,skills/upstream}
 mkdir -p handoffs/{active,blocked,completed,archived}
 mkdir -p progress
 mkdir -p docs/guides
+mkdir -p .devcontainer
 mkdir -p logs
 mkdir -p coordination
 mkdir -p swarm
@@ -162,6 +163,14 @@ done
 for f in "${ARCHETYPE_DIR}"/.claude/skills/upstream/*; do
     [[ -f "$f" ]] && cp "$f" ".claude/skills/upstream/$(basename "$f")"
 done
+
+# Devcontainer
+copy_and_sub ".devcontainer/devcontainer.json" ".devcontainer/devcontainer.json" 2>/dev/null || true
+
+# Maintainers config (required by tamper-proofing hook)
+if [[ -f "${ARCHETYPE_DIR}/.claude/maintainers.json" ]]; then
+    cp "${ARCHETYPE_DIR}/.claude/maintainers.json" ".claude/maintainers.json"
+fi
 
 # Upstream contribution scripts
 for f in "${ARCHETYPE_DIR}"/scripts/upstream/*.sh; do
@@ -278,7 +287,41 @@ AGENTS.md
 .archetype-manifest.json
 GIEOF
 
-# --- Final validation ---
+# --- Post-init validation ---
+echo ""
+echo "Running post-init validation..."
+VALIDATION_FAILED=0
+
+# Check required structure
+for d in agents agents/shared scripts/hooks scripts/validate scripts/session scripts/utils \
+         handoffs/active handoffs/completed .claude/commands .claude/skills swarm; do
+    if [[ ! -d "$d" ]]; then
+        echo "  WARN: Missing directory: $d"
+        VALIDATION_FAILED=1
+    fi
+done
+
+for f in CLAUDE.md .claude/settings.json .claude/maintainers.json .archetype-manifest.json; do
+    if [[ ! -f "$f" ]]; then
+        echo "  WARN: Missing file: $f"
+        VALIDATION_FAILED=1
+    fi
+done
+
+# Run validators if Python available
+if command -v python3 &>/dev/null; then
+    python3 scripts/validate/validate_agents_structure.py 2>/dev/null || VALIDATION_FAILED=1
+    python3 scripts/validate/validate_agents_references.py 2>/dev/null || VALIDATION_FAILED=1
+    python3 scripts/validate/validate_claude_md_consistency.py 2>/dev/null || VALIDATION_FAILED=1
+    python3 scripts/validate/validate_document_drift.py 2>/dev/null || VALIDATION_FAILED=1
+fi
+
+if [[ $VALIDATION_FAILED -eq 0 ]]; then
+    echo "Post-init validation passed"
+else
+    echo "Post-init validation completed with warnings (see above)"
+fi
+
 echo ""
 echo "=== Project initialized: ${PROJECT_NAME} ==="
 echo "Root: ${PROJECT_ROOT}"
@@ -288,5 +331,4 @@ echo "  1. Review and customize CLAUDE.md"
 echo "  2. Configure hooks in .claude/settings.json"
 echo "  3. Add agent roles in agents/"
 echo "  4. Register child repos: scripts/repos/register-repo.sh <name> <path>"
-echo "  5. Run validators: scripts/validate/validate_agents_structure.py"
-echo "  6. Index repos with GitNexus: npm install -g gitnexus && scripts/repos/sync-repos.sh --index"
+echo "  5. Index repos with GitNexus: npm install -g gitnexus && scripts/repos/sync-repos.sh --index"

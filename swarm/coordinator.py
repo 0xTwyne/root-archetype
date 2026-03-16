@@ -19,6 +19,17 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
+from swarm.constants import (
+    SQLITE_CONNECT_TIMEOUT,
+    SQLITE_BUSY_TIMEOUT,
+    HEARTBEAT_STALE_SECONDS as _HEARTBEAT_STALE_SECONDS,
+    DEFAULT_LOCK_TTL as _DEFAULT_LOCK_TTL,
+    DEFAULT_AGENT_BUDGET,
+    DEFAULT_WORK_LIST_LIMIT,
+    DEFAULT_MESSAGE_LIMIT,
+    DEFAULT_BUDGET_HISTORY_LIMIT,
+)
+
 
 class WorkItemStatus(str, Enum):
     PENDING = "pending"
@@ -86,8 +97,8 @@ class Coordinator:
     by multiple agents (no HTTP server needed for <10 agents).
     """
 
-    HEARTBEAT_STALE_SECONDS = 120
-    DEFAULT_LOCK_TTL = 300
+    HEARTBEAT_STALE_SECONDS = _HEARTBEAT_STALE_SECONDS
+    DEFAULT_LOCK_TTL = _DEFAULT_LOCK_TTL
 
     def __init__(self, db_path: str | Path = "swarm/coordinator.db"):
         self.db_path = Path(db_path)
@@ -99,11 +110,11 @@ class Coordinator:
         """Context manager for database connections with WAL mode."""
         conn = sqlite3.connect(
             str(self.db_path),
-            timeout=30,
+            timeout=SQLITE_CONNECT_TIMEOUT,
             isolation_level=None,  # autocommit for WAL
         )
         conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=10000")
+        conn.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT}")
         conn.row_factory = sqlite3.Row
         try:
             yield conn
@@ -188,7 +199,7 @@ class Coordinator:
     # ---- Agent Management ----
 
     def register_agent(
-        self, name: str, role: str, budget: float = 100.0, metadata: dict | None = None
+        self, name: str, role: str, budget: float = DEFAULT_AGENT_BUDGET, metadata: dict | None = None
     ) -> str:
         """Register a new agent. Returns agent_id."""
         agent_id = f"agent_{uuid.uuid4().hex[:12]}"
@@ -386,7 +397,7 @@ class Coordinator:
             return cursor.rowcount > 0
 
     def list_work(
-        self, status: WorkItemStatus | None = None, limit: int = 50
+        self, status: WorkItemStatus | None = None, limit: int = DEFAULT_WORK_LIST_LIMIT
     ) -> list[WorkItem]:
         """List work items, optionally filtered by status."""
         with self._conn() as conn:
@@ -455,7 +466,7 @@ class Coordinator:
         return message_id
 
     def get_messages(
-        self, channel: str, since: float = 0, limit: int = 100
+        self, channel: str, since: float = 0, limit: int = DEFAULT_MESSAGE_LIMIT
     ) -> list[Message]:
         """Get messages from a channel since a timestamp."""
         with self._conn() as conn:
@@ -517,21 +528,27 @@ class Coordinator:
         ttl = ttl_seconds or self.DEFAULT_LOCK_TTL
         now = time.time()
         with self._conn() as conn:
-            # Clean expired locks first
-            conn.execute(
-                "DELETE FROM resource_locks WHERE acquired_at + ttl_seconds < ?",
-                (now,),
-            )
-            # Try to insert (fails if already held)
+            conn.execute("BEGIN IMMEDIATE")
             try:
+                # Clean expired locks first
+                conn.execute(
+                    "DELETE FROM resource_locks WHERE acquired_at + ttl_seconds < ?",
+                    (now,),
+                )
+                # Try to insert (fails if already held)
                 conn.execute(
                     "INSERT INTO resource_locks (resource_id, holder, acquired_at, ttl_seconds, metadata) "
                     "VALUES (?, ?, ?, ?, ?)",
                     (resource_id, holder, now, ttl, json.dumps(metadata or {})),
                 )
+                conn.execute("COMMIT")
                 return True
             except sqlite3.IntegrityError:
+                conn.execute("ROLLBACK")
                 return False
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
 
     def release_lock(self, resource_id: str, holder: str) -> bool:
         """Release a resource lock. Only the holder can release."""
@@ -590,6 +607,26 @@ class Coordinator:
             except Exception:
                 conn.execute("ROLLBACK")
                 raise
+
+    def get_budget_history(
+        self, agent_id: str, limit: int = DEFAULT_BUDGET_HISTORY_LIMIT
+    ) -> list[dict[str, Any]]:
+        """Get budget ledger entries for an agent."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT action_type, cost, timestamp, description "
+                "FROM budget_ledger WHERE agent_id = ? ORDER BY timestamp DESC LIMIT ?",
+                (agent_id, limit),
+            ).fetchall()
+            return [
+                {
+                    "action_type": r["action_type"],
+                    "cost": r["cost"],
+                    "timestamp": r["timestamp"],
+                    "description": r["description"],
+                }
+                for r in rows
+            ]
 
     def set_budget(self, agent_id: str, budget: float) -> bool:
         """Set an agent's budget (for MetaOptimizer adjustments)."""

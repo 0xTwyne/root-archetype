@@ -91,12 +91,59 @@ run_sequential() {
     local wt_path
     wt_path=$(setup_worktree "main")
 
-    # Parse tasks from yaml (simplified — production would use yq)
-    echo "TODO: Parse tasks from nightshift.yaml and execute sequentially"
-    echo "Each task runs in worktree: ${wt_path}"
-
     agent_task_start "Sequential nightshift" "Processing tasks one at a time"
-    # ... task execution would go here ...
+
+    # Parse tasks from yaml, ordered by priority descending
+    local task_count
+    task_count=$(yq '.tasks | length' "$NIGHTSHIFT_CONFIG")
+    echo "Found ${task_count} tasks in nightshift.yaml"
+
+    for i in $(seq 0 $((task_count - 1))); do
+        local name description risk analysis_only
+        name=$(yq ".tasks[$i].name" "$NIGHTSHIFT_CONFIG")
+        description=$(yq ".tasks[$i].description" "$NIGHTSHIFT_CONFIG")
+        risk=$(yq ".tasks[$i].risk_level" "$NIGHTSHIFT_CONFIG")
+        analysis_only=$(yq ".tasks[$i].analysis_only" "$NIGHTSHIFT_CONFIG")
+
+        # Skip non-analysis tasks when inference is active
+        if [[ "$INFERENCE_ACTIVE" == "true" && "$analysis_only" != "true" ]]; then
+            echo "  SKIP: ${name} (inference active, not analysis-only)"
+            continue
+        fi
+
+        echo ""
+        echo "--- Task: ${name} [${risk}] ---"
+        echo "  ${description}"
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo "  [DRY RUN] Would execute in ${wt_path}"
+            continue
+        fi
+
+        agent_task_start "nightshift:${name}" "${description}"
+
+        # Execute task as a Claude Code session in the worktree
+        local task_result=0
+        if command -v claude &>/dev/null; then
+            claude --worktree "$wt_path" \
+                --message "Run nightshift task '${name}': ${description}. Risk level: ${risk}. Report findings in a structured format." \
+                --max-turns 10 \
+                --output-format json \
+                > "${LOG_DIR}/${name}-$(date +%Y%m%d).json" 2>&1 || task_result=$?
+        else
+            echo "  WARN: claude CLI not available, skipping execution"
+            task_result=1
+        fi
+
+        if [[ $task_result -eq 0 ]]; then
+            echo "  DONE: ${name}"
+            agent_task_end "nightshift:${name}" "success"
+        else
+            echo "  FAIL: ${name} (exit=${task_result})"
+            agent_task_end "nightshift:${name}" "failure"
+        fi
+    done
+
     agent_task_end "Sequential nightshift" "success"
 }
 
@@ -144,18 +191,37 @@ print(f'\\nCoordinator: {stats[\"work_pending\"]} tasks pending')
 "
 
     # Launch workers
+    WORKER_PIDS=()
     for i in $(seq 1 "$WORKERS"); do
         local wt_path
         wt_path=$(setup_worktree "worker-${i}")
         echo "Worker ${i}: worktree at ${wt_path}"
 
-        # In production, each worker would be a Claude Code session:
-        # claude --worktree "$wt_path" --resume --message "/swarm claim-and-execute"
-        echo "TODO: Launch Claude Code session for worker ${i} in ${wt_path}"
+        if ! command -v claude &>/dev/null; then
+            echo "  WARN: claude CLI not available, cannot launch workers"
+            break
+        fi
+
+        # Each worker claims and executes tasks from the swarm queue
+        claude --worktree "$wt_path" \
+            --message "You are swarm worker ${i}. Claim tasks from the coordinator queue at ${ROOT_DIR}/swarm/coordinator.db, execute them, and report results. Use /swarm to interact with the coordinator. Stop when no pending tasks remain." \
+            --max-turns 30 \
+            --output-format json \
+            > "${LOG_DIR}/worker-${i}-$(date +%Y%m%d).json" 2>&1 &
+        WORKER_PIDS+=($!)
+        echo "  PID: ${WORKER_PIDS[-1]}"
     done
 
-    echo ""
-    echo "Swarm launched. Workers will claim tasks from the coordinator queue."
+    if [[ ${#WORKER_PIDS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Swarm launched with ${#WORKER_PIDS[@]} workers."
+        echo "Waiting for workers to finish..."
+        for pid in "${WORKER_PIDS[@]}"; do
+            wait "$pid" 2>/dev/null || echo "  Worker PID ${pid} exited with error"
+        done
+        echo "All workers finished."
+    fi
+
     echo "Monitor: python3 -c \"from swarm import Coordinator; print(Coordinator('${ROOT_DIR}/swarm/coordinator.db').stats())\""
 }
 

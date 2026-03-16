@@ -20,6 +20,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from swarm.constants import MC_HYPERVOLUME_SAMPLES, EPSILON, MAX_PENDING_SCAN
 from swarm.coordinator import Coordinator, WorkItem, WorkItemStatus
 
 
@@ -105,7 +106,7 @@ class ParetoArchive:
         if n_obj == 2:
             return self._hypervolume_2d(points, ref)
         else:
-            return self._hypervolume_mc(points, ref, n_samples=10000)
+            return self._hypervolume_mc(points, ref, n_samples=MC_HYPERVOLUME_SAMPLES)
 
     def _hypervolume_2d(self, points: list[list[float]], ref: list[float]) -> float:
         """Exact 2D hypervolume calculation."""
@@ -120,7 +121,7 @@ class ParetoArchive:
         return hv
 
     def _hypervolume_mc(
-        self, points: list[list[float]], ref: list[float], n_samples: int = 10000
+        self, points: list[list[float]], ref: list[float], n_samples: int = MC_HYPERVOLUME_SAMPLES
     ) -> float:
         """Monte Carlo hypervolume approximation for >2D."""
         import random
@@ -133,7 +134,7 @@ class ParetoArchive:
         # Volume of bounding box
         box_vol = 1.0
         for i in range(n_obj):
-            box_vol *= max(upper[i] - lower[i], 1e-10)
+            box_vol *= max(upper[i] - lower[i], EPSILON)
 
         # Sample random points and check if dominated by any frontier point
         dominated_count = 0
@@ -180,9 +181,12 @@ class ExperimentScheduler:
         config = meta.get("config", {})
         species = meta.get("species", "unknown")
 
-        # 1. Frontier distance
+        # 1. Frontier distance (normalized to [0,1] via sigmoid)
         if predicted:
-            dist = self.archive.frontier_distance(predicted)
+            raw_dist = self.archive.frontier_distance(predicted)
+            # Sigmoid normalization: maps arbitrary magnitude to (0, 1]
+            # k controls steepness; calibrated so dist=1.0 → ~0.73
+            dist = 1.0 - math.exp(-raw_dist)
         else:
             dist = 0.5  # Default if no prediction
 
@@ -224,28 +228,40 @@ class ExperimentScheduler:
             min_similarity = min(min_similarity, similarity)
         return 1.0 - min_similarity
 
-    def select_next(self) -> WorkItem | None:
-        """Select the highest-information pending experiment for validation.
+    def select_next(self, agent_id: str | None = None) -> WorkItem | None:
+        """Select and claim the highest-information pending experiment.
 
-        Re-scores all pending items and returns the best one.
-        Does NOT claim the item — caller should claim after selection.
+        Re-scores all pending items, then atomically claims the best one
+        via the coordinator to prevent two callers selecting the same item.
+
+        Args:
+            agent_id: Agent to claim on behalf of. If None, selects without claiming
+                      (legacy behavior, not thread-safe).
         """
-        pending = self.coordinator.list_work(status=WorkItemStatus.PENDING, limit=500)
+        pending = self.coordinator.list_work(status=WorkItemStatus.PENDING, limit=MAX_PENDING_SCAN)
         if not pending:
             return None
 
-        best_item = None
-        best_score = -float("inf")
-
+        # Score and update priorities for all pending items
+        scored: list[tuple[float, WorkItem]] = []
         for item in pending:
             score = self.score_experiment(item)
-            # Update the item's priority in the coordinator
             self.coordinator.update_priority(item.item_id, score)
-            if score > best_score:
-                best_score = score
-                best_item = item
+            scored.append((score, item))
 
-        return best_item
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        if agent_id is None:
+            # Legacy non-atomic path
+            return scored[0][1] if scored else None
+
+        # Try to claim top-scored items in order (another agent may have claimed the top one)
+        for _score, item in scored:
+            claimed = self.coordinator.claim_work(agent_id)
+            if claimed:
+                return claimed
+
+        return None
 
     def record_validation(
         self,
@@ -303,7 +319,7 @@ class ExperimentScheduler:
 
     def _rescore_pending(self):
         """Re-score all pending experiments against updated Pareto archive."""
-        pending = self.coordinator.list_work(status=WorkItemStatus.PENDING, limit=500)
+        pending = self.coordinator.list_work(status=WorkItemStatus.PENDING, limit=MAX_PENDING_SCAN)
         for item in pending:
             new_score = self.score_experiment(item)
             self.coordinator.update_priority(item.item_id, new_score)

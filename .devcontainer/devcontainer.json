@@ -1,0 +1,23 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "pip install pytest pyyaml && npm install -g gitnexus 2>/dev/null || true",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["swarm/"]
+      }
+    }
+  },
+  "mounts": [],
+  "remoteUser": "vscode"
+}

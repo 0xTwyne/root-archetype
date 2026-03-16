@@ -10,8 +10,8 @@ Created the `root-archetype` repository — a project-agnostic template for seed
 
 - **Location**: `/mnt/raid0/llm/root-archetype`
 - **GitHub**: https://github.com/pestopoppa/root-archetype
-- **Commits**: 4 (initial scaffold + cost policy + twyne-root port + contamination fix)
-- **Files**: 64 files, ~5000 LOC
+- **Commits**: 9 (initial scaffold + cost policy + twyne-root port + contamination fix + upstream pipeline + GitNexus + template gap docs + handoff refresh + session work)
+- **Files**: 83 files, ~6700 LOC
 
 ## What's Built
 
@@ -45,7 +45,9 @@ Created the `root-archetype` repository — a project-agnostic template for seed
 - `init-project.sh` — Seed new projects from archetype with variable substitution
 - Child repo management: register, scan-agents, sync, add-dependency
 - Nightshift swarm scheduler: run_wrapper.sh with --swarm flag, inference guard, nightshift.yaml
-- Claude Code integration: /swarm command, settings.json, skill definition
+- Upstream contribution pipeline (`scripts/upstream/`): distill + reverse-template + contamination check + PR submission, with `/upstream` command and skill
+- GitNexus codebase intelligence: structural code awareness via CLI/MCP, auto-indexed by `sync-repos.sh --index`
+- Claude Code integration: 2 commands (`swarm.md`, `upstream.md`), 2 skills (`swarm/`, `upstream/`), settings.json
 
 ## GitHub Issues (Work Backlog)
 
@@ -81,19 +83,19 @@ Created the `root-archetype` repository — a project-agnostic template for seed
 ## Known Issues / Implementation Debt
 
 **Dead code:**
-- `budget_ledger` table in coordinator.py: inserted into but never queried
-- `_submitted_items` list in client.py: appended to but never read
+- `budget_ledger` table in coordinator.py: inserted into but never queried — **FIXED**: added `get_budget_history()` query method
+- `_submitted_items` list in client.py: appended to but never read — **FIXED**: removed
 
 **Concurrency:**
-- Lock race condition in `acquire_lock()` — doesn't use `BEGIN IMMEDIATE`
-- `select_next()` not thread-safe — two callers can select same item
+- Lock race condition in `acquire_lock()` — doesn't use `BEGIN IMMEDIATE` — **FIXED**: wrapped in `BEGIN IMMEDIATE` transaction
+- `select_next()` not thread-safe — two callers can select same item — **FIXED**: `select_next(agent_id)` now atomically claims via coordinator
 
 **Scaling:**
-- Objective scoring not normalized in scheduler — `frontier_distance` can have arbitrary magnitude vs [0,1] bounded components
+- Objective scoring not normalized in scheduler — `frontier_distance` can have arbitrary magnitude vs [0,1] bounded components — **FIXED**: sigmoid normalization `1 - exp(-x)`
 
 **Stubs:**
-- Nightshift sequential mode (run_wrapper.sh:95) — TODO only
-- Nightshift worker launch (run_wrapper.sh:154) — TODO only
+- Nightshift sequential mode (run_wrapper.sh) — **FIXED**: parses yaml via `yq`, launches Claude Code per task
+- Nightshift worker launch (run_wrapper.sh) — **FIXED**: spawns parallel Claude Code sessions, waits for completion
 
 **Template gaps:**
 - `init-project.sh` doesn't copy `maintainers.json` to new projects — tamper-proofing hook silently degrades
@@ -117,9 +119,19 @@ Post-fix verification: `grep -ri 'epyc\|twyne\|llama\|Qwen\|Q4_K\|orchestrator\|
 
 | Priority | Scope | Items |
 |----------|-------|-------|
-| P1: Correctness | Issue #2 | Fix lock race, normalize scoring, remove dead code, add tests |
-| P2: Governance | Issue #1 | 2 missing validators, numeric literals, recovery scripts, commands/skills, post-init validation |
-| P3: Integration | Issues #3-4 | Nightshift worker launch, AutoPilot swarm consumer, devcontainer |
+| ~~P1: Correctness~~ | ~~Issue #2~~ | ~~Fix lock race, normalize scoring, remove dead code, add tests~~ — **DONE** |
+| ~~P2: Governance~~ | ~~Issue #1~~ | ~~2 missing validators, numeric literals, recovery scripts, post-init validation~~ — **DONE** |
+| ~~P3: Integration~~ | ~~Issues #3-4~~ | ~~Nightshift worker launch, AutoPilot swarm consumer, devcontainer~~ — **DONE** |
+
+## Completed Since Last Update
+
+| Date | Commit | Description |
+|------|--------|-------------|
+| 2026-03-16 | ea02ec0 | Upstream contribution pipeline |
+| 2026-03-16 | 7c8f559 | GitNexus codebase intelligence |
+| 2026-03-14 | 4fcb457 | Template gap documentation |
+| 2026-03-14 | 4de6809 | Handoff and issue tracker refresh |
+| 2026-03-09 | 06e1b31 | Contamination cleanup |
 
 ## Next Session
 
