@@ -73,8 +73,8 @@ echo "Copying archetype structure..."
 
 # Directories
 mkdir -p agents/shared
-mkdir -p scripts/{hooks,validate,session,nightshift,utils,repos}
-mkdir -p .claude/{commands,skills/swarm}
+mkdir -p scripts/{hooks,validate,session,nightshift,utils,repos,upstream}
+mkdir -p .claude/{commands,skills/swarm,skills/upstream}
 mkdir -p handoffs/{active,blocked,completed,archived}
 mkdir -p progress
 mkdir -p docs/guides
@@ -159,6 +159,14 @@ done
 for f in "${ARCHETYPE_DIR}"/.claude/skills/swarm/*; do
     [[ -f "$f" ]] && cp "$f" ".claude/skills/swarm/$(basename "$f")"
 done
+for f in "${ARCHETYPE_DIR}"/.claude/skills/upstream/*; do
+    [[ -f "$f" ]] && cp "$f" ".claude/skills/upstream/$(basename "$f")"
+done
+
+# Upstream contribution scripts
+for f in "${ARCHETYPE_DIR}"/scripts/upstream/*.sh; do
+    [[ -f "$f" ]] && cp "$f" "scripts/upstream/$(basename "$f")" && chmod +x "scripts/upstream/$(basename "$f")"
+done
 
 # --- Build repo map rows for CLAUDE.md ---
 REPO_MAP_ROWS=""
@@ -199,6 +207,40 @@ if [[ -n "$REPOS" ]]; then
     done
 fi
 
+# --- Write archetype manifest ---
+ARCHETYPE_VERSION=$(cd "${ARCHETYPE_DIR}" && git rev-parse HEAD 2>/dev/null || echo "unknown")
+cat > .archetype-manifest.json << MANEOF
+{
+  "archetype_origin": "${ARCHETYPE_DIR}",
+  "archetype_version": "${ARCHETYPE_VERSION}",
+  "init_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "template_values": {
+    "PROJECT_NAME": "${PROJECT_NAME}",
+    "PROJECT_ROOT": "${PROJECT_ROOT}"
+  },
+  "portable_paths": [
+    "scripts/hooks/",
+    "scripts/validate/",
+    "scripts/utils/",
+    "scripts/session/",
+    "scripts/nightshift/",
+    "scripts/repos/",
+    "scripts/upstream/",
+    "agents/shared/",
+    "agents/*.md",
+    "swarm/",
+    ".claude/commands/",
+    ".claude/skills/"
+  ],
+  "templated_files": [
+    "CLAUDE.md",
+    "README.md",
+    "SPEC.md",
+    "nightshift.yaml"
+  ]
+}
+MANEOF
+
 # --- Create .gitignore ---
 cat > .gitignore << 'GIEOF'
 # Logs
@@ -231,6 +273,9 @@ AGENTS.md
 
 # Local settings
 .claude/settings.local.json
+
+# Archetype upstream manifest (instance-local)
+.archetype-manifest.json
 GIEOF
 
 # --- Final validation ---
