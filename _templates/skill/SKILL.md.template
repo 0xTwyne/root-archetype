@@ -1,0 +1,22 @@
+---
+name: {{SKILL_NAME}}
+description: {{What it does}}. Use when {{trigger conditions}}. Do NOT use when {{negative triggers}}.
+---
+
+# {{SKILL_TITLE}}
+
+## Commands
+
+### `/{{SKILL_NAME}}`
+{{Primary command description}}.
+
+## Workflow
+
+1. {{Step 1}}
+2. {{Step 2}}
+3. {{Step 3}}
+
+## Gotchas
+
+- {{First known failure mode or edge case}}
+- {{Add more as they are discovered in use}}

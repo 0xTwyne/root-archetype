@@ -1,8 +1,9 @@
+---
+name: swarm
+description: Launch and manage multi-agent swarm coordination for parallel work. Use when user mentions "swarm", "parallel agents", "workers", "work queue", or asks to coordinate multiple agents on a task. Do NOT use for general concurrency questions unrelated to this project's swarm primitive.
+---
+
 # Swarm Coordination Skill
-
-## Description
-
-Launch and manage swarm agent coordination for multi-agent parallel work.
 
 ## Commands
 
@@ -46,3 +47,11 @@ with SwarmClient(coord, name="worker-1", role="developer") as client:
         # Execute work...
         client.complete_work(work.item_id, result="done")
 ```
+
+## Gotchas
+
+- SQLite `coordinator.db` must not be accessed by multiple processes simultaneously — use WAL mode but still serialize writes
+- Worker count should not exceed available CPU threads / 2 (each worker needs inference capacity)
+- Stale locks from crashed workers require manual `coordinator.release_lock()` cleanup — there is no automatic TTL reaper yet
+- The experiment scheduler re-scores all pending items after each validation, which can reorder the queue unexpectedly
+- Workers should run in separate worktrees for filesystem isolation — overlapping edits in the same worktree cause conflicts
