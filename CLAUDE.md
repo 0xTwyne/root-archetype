@@ -23,12 +23,14 @@ Pre/post tool-use hooks for Claude Code sessions:
 - Agent schema validation (`agents_schema_guard.sh`)
 - Agent reference validation (`agents_reference_guard.sh`)
 - Test safety (`check_test_safety.sh`)
+- Skill usage logging (`skill_usage_log.sh`)
 
 ### Validators (`scripts/validate/`)
 - Agent structure validation (`validate_agents_structure.py`)
 - Reference integrity (`validate_agents_references.py`)
 - CLAUDE.md matrix consistency (`validate_claude_md_consistency.py`)
 - Document drift detection (`validate_document_drift.py`)
+- Skills validation (`validate_skills.py`)
 
 ### Agent System (`agents/`)
 Thin-map architecture:
@@ -47,11 +49,17 @@ SQLite-backed agent coordination with priority scheduling:
 Reusable skill definitions for common workflows:
 - Swarm coordination (`swarm/`)
 - Upstream contribution (`upstream/`)
+- Code simplification review (`simplify/`)
+- Skill scaffolding (`new-skill/`)
+- Handoff creation (`new-handoff/`)
+- Safe commit with secret scanning (`safe-commit/`)
+- Skill discovery (`find-skills/`)
 
 ### Commands (`.claude/commands/`)
 Slash command definitions for Claude Code sessions:
 - `/swarm` — Swarm coordination operations (`swarm.md`)
 - `/upstream` — Contribute instance changes back to archetype (`upstream.md`)
+- `/simplify` — Review changed code for reuse, quality, and efficiency (`simplify.md`)
 
 ## Handoff Workflow
 

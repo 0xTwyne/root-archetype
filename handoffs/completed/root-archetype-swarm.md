@@ -1,6 +1,6 @@
 # Root-Archetype: Swarm Coordination Architecture
 
-## Status: IN PROGRESS
+## Status: COMPLETED
 
 ## Summary
 
@@ -47,14 +47,14 @@ Created the `root-archetype` repository — a project-agnostic template for seed
 - Nightshift swarm scheduler: run_wrapper.sh with --swarm flag, inference guard, nightshift.yaml
 - Upstream contribution pipeline (`scripts/upstream/`): distill + reverse-template + contamination check + PR submission, with `/upstream` command and skill
 - GitNexus codebase intelligence: structural code awareness via CLI/MCP, auto-indexed by `sync-repos.sh --index`
-- Claude Code integration: 2 commands (`swarm.md`, `upstream.md`), 2 skills (`swarm/`, `upstream/`), settings.json
+- Claude Code integration: 3 commands (`swarm.md`, `upstream.md`, `simplify.md`), 7 skills (`swarm/`, `upstream/`, `simplify/`, `new-skill/`, `new-handoff/`, `safe-commit/`, `find-skills/`), settings.json
 
 ## GitHub Issues (Work Backlog)
 
-1. [#1 Governance Synthesis](https://github.com/pestopoppa/root-archetype/issues/1) — Complete remaining governance ports
-2. [#2 Swarm Hardening](https://github.com/pestopoppa/root-archetype/issues/2) — Testing, edge cases, HTTP API
-3. [#3 AutoPilot as Swarm Consumer](https://github.com/pestopoppa/root-archetype/issues/3) — Restructure AutoPilot to use swarm
-4. [#4 Nightshift as Swarm Scheduler](https://github.com/pestopoppa/root-archetype/issues/4) — Full swarm-mode nightshift
+1. [#1 Governance Synthesis](https://github.com/pestopoppa/root-archetype/issues/1) — ~90% done, narrowed to `{{MAINTAINER_EMAIL}}` + context injection hooks
+2. [#2 Swarm Hardening](https://github.com/pestopoppa/root-archetype/issues/2) — ~85% done, narrowed to observability (metrics, latency, burn-rate)
+3. ~~[#3 AutoPilot as Swarm Consumer](https://github.com/pestopoppa/root-archetype/issues/3)~~ — **CLOSED** 2026-03-19
+4. ~~[#4 Nightshift as Swarm Scheduler](https://github.com/pestopoppa/root-archetype/issues/4)~~ — **CLOSED** 2026-03-19
 
 ## Key Design Decisions
 
@@ -133,6 +133,24 @@ Post-fix verification: `grep -ri 'epyc\|twyne\|llama\|Qwen\|Q4_K\|orchestrator\|
 | 2026-03-14 | 4de6809 | Handoff and issue tracker refresh |
 | 2026-03-09 | 06e1b31 | Contamination cleanup |
 
+## Backlog Cleanup Audit — 2026-03-19
+
+Cross-referenced all 4 GitHub issues against codebase:
+- **#3, #4**: Fully complete → closed with summary comments
+- **#1**: Narrowed from ~12 items to 1 (context injection hooks — opt-in, low priority)
+- **#2**: All items complete including observability (TPE + HTTP API marked won't-do)
+- Issue bodies updated with checkmarks, comments added with audit details
+- Handoff marked COMPLETED and moved to `handoffs/completed/`
+
+### Implementation (same session)
+
+| Item | Deliverable |
+|------|-------------|
+| `{{MAINTAINER_EMAIL}}` template variable | `init-project.sh --email`, `maintainers.json` templatized |
+| Swarm observability | `swarm/metrics.py` (230 LOC): latency, burn-rate, activity, info-gain, audit integration |
+| Metrics tests | `swarm/test_metrics.py` (14 tests, all passing) |
+| CLAUDE.md sync | Added `skill_usage_log.sh`, `validate_skills.py`, 5 skills, 1 command |
+
 ## Next Session
 
-Continue work directly in `/mnt/raid0/llm/root-archetype` — the repo is self-governing with its own `.claude/` config. Use GitHub issues #1-#4 as the backlog.
+Only remaining open item: **Context injection hooks** (Issue #1) — opt-in benchmark/accounting/skills injection at SubagentStart. Low priority. No active handoff needed.

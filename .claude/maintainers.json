@@ -1,11 +1,11 @@
 {
   "_doc": "Two-level maintainer model. Global maintainers can modify any protected file. Scoped maintainers are restricted to their repos.",
   "global": [
-    "dpinna@protonmail.com"
+    "{{MAINTAINER_EMAIL}}"
   ],
   "scopes": {
     "{{PROJECT_NAME}}": {
-      "maintainers": ["dpinna@protonmail.com"],
+      "maintainers": ["{{MAINTAINER_EMAIL}}"],
       "protected_paths": [".claude/", "CLAUDE.md", "SPEC.md", "scripts/", "docs/"]
     }
   }

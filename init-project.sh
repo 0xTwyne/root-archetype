@@ -5,14 +5,15 @@ set -euo pipefail
 # Usage: ./init-project.sh <project-name> <project-root> [--repos "name:path,name:path"]
 
 usage() {
-    echo "Usage: $0 <project-name> <project-root> [--repos \"name:path,name:path\"]"
+    echo "Usage: $0 <project-name> <project-root> [--repos \"name:path,name:path\"] [--email \"user@example.com\"]"
     echo ""
     echo "  project-name   Short identifier (e.g., my-project)"
     echo "  project-root   Absolute path where the root repo will be created"
     echo "  --repos        Comma-separated child repos to register (name:path pairs)"
+    echo "  --email        Maintainer email for the seeded project"
     echo ""
     echo "Example:"
-    echo "  $0 my-project /tmp/test --repos \"app:/tmp/app,lib:/tmp/lib\""
+    echo "  $0 my-project /tmp/test --repos \"app:/tmp/app,lib:/tmp/lib\" --email \"dev@example.com\""
     exit 1
 }
 
@@ -25,10 +26,15 @@ PROJECT_ROOT="$2"
 shift 2
 
 REPOS=""
+MAINTAINER_EMAIL=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --repos)
             REPOS="$2"
+            shift 2
+            ;;
+        --email)
+            MAINTAINER_EMAIL="$2"
             shift 2
             ;;
         *)
@@ -43,6 +49,7 @@ ARCHETYPE_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "=== Root-Archetype Project Initializer ==="
 echo "Project:  ${PROJECT_NAME}"
 echo "Root:     ${PROJECT_ROOT}"
+echo "Email:    ${MAINTAINER_EMAIL:-not set}"
 echo "Repos:    ${REPOS:-none}"
 echo ""
 
@@ -89,6 +96,7 @@ substitute() {
     sed -i \
         -e "s|{{PROJECT_NAME}}|${PROJECT_NAME}|g" \
         -e "s|{{PROJECT_ROOT}}|${PROJECT_ROOT}|g" \
+        -e "s|{{MAINTAINER_EMAIL}}|${MAINTAINER_EMAIL}|g" \
         "$file"
 }
 
@@ -170,6 +178,7 @@ copy_and_sub ".devcontainer/devcontainer.json" ".devcontainer/devcontainer.json"
 # Maintainers config (required by tamper-proofing hook)
 if [[ -f "${ARCHETYPE_DIR}/.claude/maintainers.json" ]]; then
     cp "${ARCHETYPE_DIR}/.claude/maintainers.json" ".claude/maintainers.json"
+    substitute ".claude/maintainers.json"
 fi
 
 # Upstream contribution scripts
@@ -225,7 +234,8 @@ cat > .archetype-manifest.json << MANEOF
   "init_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "template_values": {
     "PROJECT_NAME": "${PROJECT_NAME}",
-    "PROJECT_ROOT": "${PROJECT_ROOT}"
+    "PROJECT_ROOT": "${PROJECT_ROOT}",
+    "MAINTAINER_EMAIL": "${MAINTAINER_EMAIL}"
   },
   "portable_paths": [
     "scripts/hooks/",

@@ -49,6 +49,13 @@ Inspired by [agenthub](https://github.com/karpathy/agenthub) but adapted for:
 - Context manager support (auto-start/stop heartbeat)
 - Lock tracking and cleanup on exit
 
+### Metrics (`metrics.py`)
+- Read-only metrics exporter for coordinator database
+- Work item latency distributions (p50/p95/p99)
+- Budget burn-rate per agent with action type breakdown
+- Agent activity tracking and information gain accuracy
+- Audit trail integration via `emit_to_audit_log()`
+
 ## Usage
 
 ```python
