@@ -1,6 +1,6 @@
 # Skills Framework Optimization
 
-**Status**: active
+**Status**: completed
 **Created**: 2026-03-18
 **Last audited**: 2026-03-18
 **Origin**: Cross-reference analysis of Anthropic internal skills practices (Thariq Shihipar, MTS Claude Code, March 2026 blog) and official "Complete Guide to Building Skills for Claude" (Anthropic, 29-page PDF) against epyc-root governance instance
@@ -370,11 +370,11 @@ This becomes the reference doc for anyone creating skills in any root-archetype 
 
 ### Nice-to-have (can be separate follow-up handoffs)
 
-- [ ] `find-skills` meta-discovery skill (Phase 2.2 — external dependency)
-- [ ] `safe-commit` skill (Phase 2.4 — needs deconfliction with existing hooks)
-- [ ] `simplify` archetype-owned version (Phase 2.5 — needs decision on external vs owned)
-- [ ] Trigger test examples exist for all skills (Phase 3.4 — documentation artifact)
-- [ ] At least one on-demand hook pattern is demonstrated (Phase 2.4)
+- [x] `find-skills` meta-discovery skill (Phase 2.2 — graceful npx fallback, agent-discoverable docs)
+- [x] `safe-commit` skill (Phase 2.4 — staged-diff scanning + branch protection, deconflicted with existing hooks)
+- [x] `simplify` archetype-owned version (Phase 2.5 — migrated from user plugin, project-agnostic)
+- [x] Trigger test template added to `_templates/skill/tests/triggers.md.template`; new-skill step 7 references it (Phase 3.4)
+- [x] On-demand hook pattern demonstrated in safe-commit (PreToolUse intercept on `git commit`)
 
 ### Out of scope (tracked separately)
 

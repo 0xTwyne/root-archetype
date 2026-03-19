@@ -30,6 +30,11 @@
             "type": "command",
             "command": "bash scripts/hooks/check_test_safety.sh",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/skills/safe-commit/scripts/pre-commit-hook.sh",
+            "timeout": 10000
           }
         ]
       },

@@ -40,6 +40,8 @@ When the user wants a new skill:
 
 6. If the skill overlaps with an existing skill, add a **When to Use What** decision matrix in both skills.
 
+7. (Optional) Create `tests/triggers.md` from the template at `_templates/skill/tests/triggers.md.template` with example prompts that should and should not activate the skill. This helps refine the description field over time.
+
 ## Template location
 
 The canonical template is at `_templates/skill/SKILL.md.template`. Read it for the skeleton structure, then customize for the specific skill.
@@ -56,3 +58,4 @@ Read `references/description-guide.md` for the full description formula with goo
 - Keep SKILL.md body under 5000 words — this is Level 2 content loaded on every trigger, bloat wastes tokens
 - The `assets/` directory is optional — only create it if the skill needs templates or example outputs
 - If the skill needs tool restrictions, use the `allowed-tools` frontmatter field with `Tool(pattern)` syntax
+- The `tests/triggers.md` file is optional — only create it if the skill has non-obvious trigger boundaries. It's a documentation artifact for human review, not an automated test suite

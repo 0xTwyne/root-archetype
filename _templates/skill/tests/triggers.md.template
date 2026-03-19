@@ -1,0 +1,25 @@
+# Trigger Tests for {{SKILL_NAME}}
+
+Test cases for validating skill trigger accuracy. These are documentation artifacts for human review — use them when refining the `description` field in SKILL.md frontmatter.
+
+## Should Trigger
+
+Prompts that should activate this skill:
+
+- "{{example trigger phrase 1}}"
+- "{{example trigger phrase 2}}"
+- "{{example trigger phrase 3}}"
+
+## Should NOT Trigger
+
+Prompts that should NOT activate this skill:
+
+- "{{example non-trigger phrase 1}}"
+- "{{example non-trigger phrase 2}}"
+- "{{example non-trigger phrase 3}}"
+
+## Notes
+
+- If the skill triggers on a "Should NOT" case, narrow the `description` field or add negative triggers
+- If the skill fails to trigger on a "Should" case, add the missing keyword to `description`
+- Review these cases whenever the description is modified
