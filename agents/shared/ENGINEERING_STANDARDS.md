@@ -16,6 +16,14 @@ Every numeric value is classified as:
 
 Do NOT consolidate all numbers in one file; preserve subsystem ownership.
 
+## Instruction Budget Policy
+
+Every instruction in agent files is classified as:
+- **essential-toolchain**: build commands, test runners, required toolchain (e.g., `uv`, specific pytest flags) that the agent cannot discover from the repo
+- **nice-to-have**: style guides, architecture overviews, coding preferences
+
+Target: agent files ≤400 words of essential-toolchain instructions. Overviews and style guides are excluded — agents explore better than they parse descriptions. Every instruction consumes model attention budget; verbose files increase inference cost by 20%+ without improving success rates.
+
 ## Change Style
 
 - One concern per change

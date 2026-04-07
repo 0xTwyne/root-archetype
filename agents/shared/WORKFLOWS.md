@@ -21,6 +21,15 @@
 3. Apply change via audited commands
 4. Validate expected impact and stability
 
+## Harness Change Evaluation
+
+1. Measure baseline metrics (success rate, cost, instruction overhead)
+2. Apply harness change (prompt edit, tool addition, hook)
+3. Run same eval suite on changed harness
+4. Compare: quality delta, cost delta, instruction_token_ratio delta
+5. Accept only if quality holds AND cost increase is proportionate
+6. If adding instructions: verify they're essential-toolchain, not nice-to-have
+
 ## Handoff Closure
 
 1. Reconcile handoff checklist against real code/tests
