@@ -1,0 +1,26 @@
+#!/bin/bash
+set -euo pipefail
+
+# GitHub CLI wrapper — thin interface for agent use
+# Requires: gh (https://cli.github.com/) authenticated via `gh auth login`
+#
+# Usage examples (copy to CLAUDE.md for agent discovery):
+#
+#   # List open PRs with key fields
+#   gh pr list --json number,title,author,createdAt,headRefName --limit 20
+#
+#   # View PR details including checks and reviews
+#   gh pr view 123 --json title,body,reviews,statusCheckRollup
+#
+#   # Create PR with structured body
+#   gh pr create --title "Fix: description" --body "## Summary\n- Change 1\n- Change 2"
+#
+#   # List issues assigned to me
+#   gh issue list --assignee @me --json number,title,labels,milestone
+#
+#   # View repo info
+#   gh repo view --json name,description,defaultBranchRef,languages
+
+# Pass all arguments through to gh with JSON output preference
+# Override --json fields per command as needed
+exec gh "$@"

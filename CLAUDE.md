@@ -54,6 +54,7 @@ Reusable skill definitions for common workflows:
 - Handoff creation (`new-handoff/`)
 - Safe commit with secret scanning (`safe-commit/`)
 - Skill discovery (`find-skills/`)
+- Project wiki maintenance (`project-wiki/`)
 
 ### Commands (`.claude/commands/`)
 Slash command definitions for Claude Code sessions:

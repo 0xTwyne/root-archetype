@@ -1,6 +1,6 @@
 # Knowledge Base Linter & Governance Hygiene Patterns
 
-**Status**: active
+**Status**: completed
 **Created**: 2026-04-06 (via research intake deep-dive)
 **Categories**: governance, validation, upstream
 **Origin**: intake-268 (Karpathy LLM Wiki), intake-269 (nvk/llm-wiki), intake-270 (tobi/qmd)
@@ -24,16 +24,16 @@ Root-archetype has 5 validators but none that lint the knowledge base itself. Th
 
 - [x] Create lint implementation — ✅ 2026-04-07. SUPERSEDED by project-wiki skill: `.claude/skills/project-wiki/scripts/lint_wiki.py` with 5 passes (orphan, stale, contradictory, un-actioned, missing cross-refs). Config-driven via `wiki.yaml`. Validated in epyc-root first (found 4 errors + 71 warnings), then upstreamed.
 - [x] Register linter — ✅ 2026-04-07. Part of project-wiki skill, wired to nightshift in epyc-root.
-- [ ] Add to `CLAUDE.md` validators list
+- [x] Add to `CLAUDE.md` validators list — ✅ 2026-04-09 Added project-wiki skill to Skills section
 
 ### Phase 3 — Skill template additions (P1)
 
 - [x] Create `_templates/skill/references/credibility-scoring-rubric.md` — ✅ 2026-04-07. 6-point rubric with High/Medium/Low tiers and skip criteria.
-- [ ] Add commented anti-confirmation-bias section to `_templates/skill/SKILL.md.template`
+- [x] Add commented anti-confirmation-bias section to `_templates/skill/SKILL.md.template` — ✅ 2026-04-09
 
 ### Phase 4 — Session persistence template (P2)
 
-- [ ] Create `_templates/skill/references/session-persistence-schema.md` — deferred (P2, documentation only)
+- [x] Create `_templates/skill/references/session-persistence-schema.md` — ✅ 2026-04-09
 
 ---
 

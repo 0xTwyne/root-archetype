@@ -20,3 +20,9 @@ description: {{What it does}}. Use when {{trigger conditions}}. Do NOT use when 
 
 - {{First known failure mode or edge case}}
 - {{Add more as they are discovered in use}}
+
+<!-- Optional: uncomment for skills that ingest external information -->
+<!-- ## Research Intake -->
+<!-- - Score source credibility (see references/credibility-scoring-rubric.md) -->
+<!-- - Seek disconfirming evidence for each claim before recording -->
+<!-- - Flag single-source claims as provisional -->

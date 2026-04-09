@@ -1,6 +1,6 @@
 # Harness Engineering Patterns
 
-**Status**: active
+**Status**: completed
 **Created**: 2026-04-06 (via research intake deep-dive)
 **Categories**: agent_architecture, governance
 **Origin**: intake-271 (HumanLayer), intake-272 (ETH Zurich), intake-273 (Chroma), intake-274 (Complexity Trap)
@@ -105,11 +105,11 @@ exit 0  # Silent success
 
 ## Outstanding Tasks
 
-- [ ] Implement patterns as skill templates in `_templates/skill/`
-- [ ] Add PostStop hook example to `_templates/hooks/`
-- [ ] Document CLI wrapper pattern with examples for common services (GitHub CLI, Docker CLI)
-- [ ] Add instruction budget guidance to `agents/shared/ENGINEERING_STANDARDS.md` (see companion edit)
-- [ ] Create decision matrix: CLI vs MCP vs native tool (scoring rubric)
+- [x] Implement patterns as skill templates in `_templates/skill/` — ✅ 2026-04-09 `_templates/skill/references/harness-patterns.md`
+- [x] Add PostStop hook example to `_templates/hooks/` — ✅ 2026-04-09 `_templates/hooks/poststop_verify.sh.template`
+- [x] Document CLI wrapper pattern with examples for common services (GitHub CLI, Docker CLI) — ✅ 2026-04-09 `_templates/cli-wrappers/`
+- [x] Add instruction budget guidance to `agents/shared/ENGINEERING_STANDARDS.md` — ✅ Already present in ENGINEERING_STANDARDS.md lines 19-25
+- [x] Create decision matrix: CLI vs MCP vs native tool (scoring rubric) — ✅ 2026-04-09 `_templates/skill/references/tool-integration-decision-matrix.md`
 
 ---
 

@@ -1,0 +1,46 @@
+#!/bin/bash
+set -euo pipefail
+
+# Hook: PostStop verification gate
+# Trigger: Stop
+# Purpose: Run build/lint/typecheck when agent signals completion.
+#          Exit 0 = silent success. Exit 2 = re-engage agent with errors.
+#
+# Usage: Copy to .claude/hooks/, replace {{placeholders}}, register in settings.json.
+
+# --- Configuration (replace these) ---
+BUILD_CMD="{{BUILD_CMD}}"       # e.g., "npm run build", "cargo build", "go build ./..."
+LINT_CMD="{{LINT_CMD}}"         # e.g., "npm run lint", "cargo clippy", "golangci-lint run"
+TYPECHECK_CMD="{{TYPECHECK_CMD}}" # e.g., "npx tsc --noEmit", "" (empty to skip)
+
+# --- Execution ---
+failures=""
+output=""
+
+run_check() {
+  local name="$1"
+  local cmd="$2"
+
+  if [[ -z "$cmd" ]]; then
+    return 0  # Skip empty commands
+  fi
+
+  local result
+  if ! result=$(eval "$cmd" 2>&1); then
+    failures+="$name "
+    output+="=== $name FAILED ===$'\n'$result$'\n\n'"
+  fi
+}
+
+run_check "build" "$BUILD_CMD"
+run_check "lint" "$LINT_CMD"
+run_check "typecheck" "$TYPECHECK_CMD"
+
+if [[ -n "$failures" ]]; then
+  echo "Verification failed: $failures"
+  echo ""
+  echo "$output"
+  exit 2  # Re-engage agent
+fi
+
+exit 0  # Silent success
