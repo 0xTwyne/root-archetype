@@ -1,0 +1,7 @@
+# Thinking/Reasoning Suffix
+
+Append to system prompt for models with extended thinking capability:
+
+```
+Think step by step in <think> tags. Answer portion: under 50 words.
+```

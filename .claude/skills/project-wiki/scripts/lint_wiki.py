@@ -22,7 +22,20 @@ except ImportError:
     print("ERROR: PyYAML not installed. Run: pip install pyyaml")
     sys.exit(1)
 
-ROOT = Path(__file__).resolve().parents[4]  # epyc-root
+def _find_project_root() -> Path:
+    """Walk up from this file to find project root (contains wiki.yaml or .git)."""
+    current = Path(__file__).resolve().parent
+    for _ in range(10):  # Max 10 levels up
+        if (current / "wiki.yaml").exists() or (current / ".git").exists():
+            return current
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    # Fallback: assume 4 levels up (original behavior)
+    return Path(__file__).resolve().parents[4]
+
+ROOT = _find_project_root()
 
 # Severity levels
 ERROR = "ERROR"
@@ -52,6 +65,8 @@ def _get_lint_config(config: dict) -> dict:
             "orphan_handoffs", "stale_entries", "contradictory_status",
             "unactioned_intake", "missing_cross_refs",
         ]),
+        "paths": lint.get("paths", {}),
+        "index_patterns": lint.get("index_patterns", ["*-index.md"]),
     }
 
 
@@ -60,31 +75,36 @@ def _extract_md_links(content: str) -> list[str]:
     return re.findall(r'\[(?:[^\]]*)\]\(([^)]+\.md)\)', content)
 
 
-def _extract_referenced_handoffs(active_dir: Path) -> set[str]:
-    """Parse all *-index.md files and extract referenced handoff filenames."""
+def _extract_referenced_handoffs(active_dir: Path, extra_index_patterns: list[str] | None = None) -> set[str]:
+    """Parse index files and extract referenced handoff filenames.
+    
+    Scans files matching extra_index_patterns (default: ["*-index.md"]).
+    """
+    patterns = extra_index_patterns or ["*-index.md"]
     referenced = set()
-    for index_file in active_dir.glob("*-index.md"):
-        content = index_file.read_text(errors="replace")
-        for link in _extract_md_links(content):
-            # Normalize: strip relative paths, keep just filename
-            referenced.add(Path(link).name)
-    # Also check master-handoff-index.md
-    master = active_dir / "master-handoff-index.md"
-    if master.exists():
-        content = master.read_text(errors="replace")
-        for link in _extract_md_links(content):
-            referenced.add(Path(link).name)
+    seen_files: set[Path] = set()
+    for pattern in patterns:
+        for index_file in active_dir.glob(pattern):
+            if index_file in seen_files:
+                continue
+            seen_files.add(index_file)
+            file_content = index_file.read_text(errors="replace")
+            for link in _extract_md_links(file_content):
+                # Normalize: strip relative paths, keep just filename
+                referenced.add(Path(link).name)
     return referenced
 
 
-def check_orphan_handoffs(active_dir: Path) -> list[Issue]:
+def check_orphan_handoffs(active_dir: Path, index_patterns: list[str] | None = None) -> list[Issue]:
     """Pass 1: Find handoff files not referenced by any index."""
     issues: list[Issue] = []
-    referenced = _extract_referenced_handoffs(active_dir)
+    patterns = index_patterns or ["*-index.md"]
+    referenced = _extract_referenced_handoffs(active_dir, patterns)
 
     # Index files themselves are not orphans
-    index_files = {f.name for f in active_dir.glob("*-index.md")}
-    index_files.add("master-handoff-index.md")
+    index_files: set[str] = set()
+    for pattern in patterns:
+        index_files.update(f.name for f in active_dir.glob(pattern))
 
     for md_file in sorted(active_dir.glob("*.md")):
         name = md_file.name
@@ -213,9 +233,12 @@ def main() -> int:
     lint_cfg = _get_lint_config(config)
     enabled = set(lint_cfg["enabled_passes"])
 
-    active_dir = ROOT / "handoffs" / "active"
-    completed_dir = ROOT / "handoffs" / "completed"
-    index_path = ROOT / "research" / "intake_index.yaml"
+    # Configurable paths with defaults
+    paths_cfg = lint_cfg.get("paths", {})
+    active_dir = ROOT / paths_cfg.get("active_handoffs", "handoffs/active")
+    completed_dir = ROOT / paths_cfg.get("completed_handoffs", "handoffs/completed")
+    index_path = ROOT / paths_cfg.get("intake_index", "research/intake_index.yaml")
+    index_patterns = lint_cfg.get("index_patterns", ["*-index.md"])
 
     if not active_dir.exists():
         print(f"ERROR: Active handoffs directory not found at {active_dir}")
@@ -226,7 +249,7 @@ def main() -> int:
 
     # Pass 1: Orphan handoffs
     if "orphan_handoffs" in enabled:
-        issues = check_orphan_handoffs(active_dir)
+        issues = check_orphan_handoffs(active_dir, index_patterns)
         all_issues.extend(issues)
         pass_names.append(("Orphan handoffs", issues))
 
