@@ -27,6 +27,7 @@ source scripts/utils/agent_log.sh
 │   ├── nightshift/      # Autonomous overnight scheduler
 │   ├── repos/           # Child repo management
 │   └── utils/           # Shared utilities (logging, analysis)
+├── secrets/             # Protected secrets (contents gitignored)
 ├── swarm/               # Swarm coordination primitive
 ├── .claude/             # Claude Code configuration
 │   ├── settings.json    # Hook wiring
@@ -48,6 +49,7 @@ source scripts/utils/agent_log.sh
 - **Hooks**: Pre-tool-use gates (filesystem safety, schema validation, etc.)
 - **Validators**: Structural consistency checks
 - **Agent System**: Thin-map architecture — shared policy + lean role overlays
+- **Secrets Protection**: Config-driven read-blocking hook + sandbox template
 - **Audit Logging**: Append-only JSONL with session tracking
 - **Swarm Coordination**: SQLite-backed agent coordination with priority scheduling
 
