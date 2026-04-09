@@ -89,6 +89,7 @@ mkdir -p .devcontainer
 mkdir -p logs
 mkdir -p coordination
 mkdir -p swarm
+mkdir -p secrets
 
 # --- Template substitution function ---
 substitute() {
@@ -186,6 +187,16 @@ if [[ -d "${ARCHETYPE_DIR}/.claude/skills/project-wiki" ]]; then
     done
 fi
 
+
+# Hook library and policy hooks
+mkdir -p .claude/hooks/lib
+for f in "${ARCHETYPE_DIR}"/.claude/hooks/*.sh; do
+    [[ -f "$f" ]] && cp "$f" ".claude/hooks/$(basename "$f")" && chmod +x ".claude/hooks/$(basename "$f")"
+done
+for f in "${ARCHETYPE_DIR}"/.claude/hooks/lib/*; do
+    [[ -f "$f" ]] && cp "$f" ".claude/hooks/lib/$(basename "$f")"
+done
+
 # Wiki structure (wiki.yaml + SCHEMA.md scaffold)
 if [[ -f "${ARCHETYPE_DIR}/_templates/wiki.yaml.template" ]]; then
     mkdir -p wiki
@@ -209,6 +220,15 @@ if [[ -f "${ARCHETYPE_DIR}/_templates/wiki.yaml.template" ]]; then
 | Alias | Maps To |
 |-------|---------|
 WIKIEOF
+fi
+
+# Secrets protection
+cp "${ARCHETYPE_DIR}/secrets/.secretpaths" "secrets/.secretpaths"
+touch "secrets/.gitkeep"
+
+# Sandbox settings template (user customizes)
+if [[ -f "${ARCHETYPE_DIR}/_templates/settings.local.json.template" ]]; then
+    cp "${ARCHETYPE_DIR}/_templates/settings.local.json.template" ".claude/settings.local.json"
 fi
 
 # Devcontainer
@@ -288,7 +308,8 @@ cat > .archetype-manifest.json << MANEOF
     "agents/*.md",
     "swarm/",
     ".claude/commands/",
-    ".claude/skills/"
+    ".claude/skills/",
+    "secrets/.secretpaths"
   ],
   "templated_files": [
     "CLAUDE.md",
@@ -332,6 +353,11 @@ AGENTS.md
 # Local settings
 .claude/settings.local.json
 
+# Secrets (directory tracked, contents ignored)
+secrets/*
+!secrets/.gitkeep
+!secrets/.secretpaths
+
 # Archetype upstream manifest (instance-local)
 .archetype-manifest.json
 GIEOF
@@ -357,6 +383,14 @@ for f in CLAUDE.md .claude/settings.json .claude/maintainers.json .archetype-man
     fi
 done
 
+# Sandbox prerequisite check
+if ! command -v bwrap &>/dev/null; then
+    echo "  WARN: bubblewrap (bwrap) not installed. Sandbox will not work."
+    echo "  Install: sudo apt install bubblewrap (Debian/Ubuntu)"
+    echo "  Without sandbox, hooks cannot enforce OS-level read/write restrictions."
+    VALIDATION_FAILED=1
+fi
+
 # Run validators if Python available
 if command -v python3 &>/dev/null; then
     python3 scripts/validate/validate_agents_structure.py 2>/dev/null || VALIDATION_FAILED=1
@@ -381,3 +415,5 @@ echo "  2. Configure hooks in .claude/settings.json"
 echo "  3. Add agent roles in agents/"
 echo "  4. Register child repos: scripts/repos/register-repo.sh <name> <path>"
 echo "  5. Index repos with GitNexus: npm install -g gitnexus && scripts/repos/sync-repos.sh --index"
+echo "  6. Install bubblewrap for sandbox: sudo apt install bubblewrap"
+echo "  7. Review secrets/.secretpaths and add project-specific protected paths"

@@ -1,0 +1,13 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "denyRead": ["~/", "/"],
+      "allowRead": [".", "/tmp"],
+      "denyWrite": ["/"],
+      "allowWrite": [".", "/tmp"]
+    }
+  }
+}

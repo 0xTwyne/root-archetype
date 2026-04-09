@@ -26,5 +26,10 @@ swarm/*.db-shm
 .gitnexus/
 AGENTS.md
 
+# Secrets (directory tracked, contents ignored)
+secrets/*
+!secrets/.gitkeep
+!secrets/.secretpaths
+
 # Local settings
 .claude/settings.local.json

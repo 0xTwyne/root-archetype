@@ -25,6 +25,13 @@ Pre/post tool-use hooks for Claude Code sessions:
 - Test safety (`check_test_safety.sh`)
 - Skill usage logging (`skill_usage_log.sh`)
 
+### Secrets Protection (`secrets/`)
+Convention for sensitive data that must never be read by AI agents:
+- `secrets/` directory: gitkepped but contents gitignored
+- `secrets/.secretpaths`: configurable list of protected path patterns
+- `check_secrets_read.sh` hook: blocks Read/Glob/Grep/Bash access to protected paths
+- Sandbox (`settings.local.json`): OS-level filesystem isolation via bubblewrap
+
 ### Validators (`scripts/validate/`)
 - Agent structure validation (`validate_agents_structure.py`)
 - Reference integrity (`validate_agents_references.py`)
