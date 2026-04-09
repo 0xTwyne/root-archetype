@@ -64,7 +64,7 @@ python3 .claude/skills/project-wiki/scripts/query_wiki.py "{query}" --human
 
 Searches intake index, handoffs, and deep-dives. Returns ranked results.
 
-## Boundaries
+## Gotchas
 
 - Lint only reports — does NOT auto-fix.
 - Query synthesizes from existing KB — does NOT fetch external information.
