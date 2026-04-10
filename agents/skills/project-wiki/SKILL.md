@@ -63,8 +63,34 @@ python3 .claude/skills/project-wiki/scripts/query_wiki.py "{query}" --human
 
 Searches intake index, handoffs, and deep-dives. Returns ranked results.
 
+### Operation 3 — Compile
+
+Compile per-user streams into shared knowledge artifacts.
+
+Invoke with: "compile the wiki" / "update knowledge base"
+
+#### Compilation Sources
+
+Read from ALL user streams:
+- `logs/progress/*/` — per-user session progress reports
+- `notes/*/` — per-user notes, plans, research
+- `notes/*/handoffs/` — per-user handoff documents
+
+#### Compilation Outputs
+
+1. **Wiki pages** written to `knowledge/wiki/`
+2. **Taxonomy updates** appended to `knowledge/taxonomy.yaml` for new categories discovered during compilation
+3. **Handoff index** regenerated at `notes/handoffs/INDEX.md` by scanning all `notes/*/handoffs/*.md`
+
+#### Compilation State
+
+Track last compilation via `knowledge/research/.last_compile` timestamp file.
+The session-start hook checks this timestamp against source modification dates
+and warns when recompilation is needed.
+
 ## Gotchas
 
 - Lint only reports — does NOT auto-fix.
 - Query synthesizes from existing KB — does NOT fetch external information.
+- Compile reads all user streams but writes only to shared locations (`knowledge/`, `notes/handoffs/INDEX.md`).
 - Scaling thresholds in `wiki.yaml` are advisory only.

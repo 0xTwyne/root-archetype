@@ -109,6 +109,15 @@ if [[ -f "$FACTS_FILE" ]] && [[ -s "$FACTS_FILE" ]]; then
   CONTEXT+="$(cat "$FACTS_FILE")\n"
 fi
 
+
+# --- Stale wiki detection ---
+if [[ -f "$PROJECT_DIR/knowledge/research/.last_compile" ]]; then
+  NEWEST_SOURCE="$(find "$PROJECT_DIR/logs/progress" "$PROJECT_DIR/notes" -name '*.md' -newer "$PROJECT_DIR/knowledge/research/.last_compile" 2>/dev/null | head -1)"
+  if [[ -n "$NEWEST_SOURCE" ]]; then
+    CONTEXT+="Knowledge base may be stale. Run /project-wiki compile to update.\n"
+  fi
+fi
+
 # --- Structural invariant check ---
 if [[ -x "$PROJECT_DIR/scripts/validate/validate_agents_structure.py" ]]; then
   if ! python3 "$PROJECT_DIR/scripts/validate/validate_agents_structure.py" &>/dev/null; then

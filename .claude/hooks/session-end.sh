@@ -21,6 +21,26 @@ if [[ -f "$PROJECT_DIR/scripts/utils/agent_log.sh" ]]; then
   agent_session_end "Session ended for $SESSION_USER"
 fi
 
+
+# --- Write per-user progress report ---
+if [[ -n "$SESSION_USER" && "$SESSION_USER" != "unknown" ]]; then
+  PROGRESS_DIR="$PROJECT_DIR/logs/progress/$SESSION_USER"
+  mkdir -p "$PROGRESS_DIR"
+  PROGRESS_FILE="$PROGRESS_DIR/$(date -u +%Y-%m-%d).md"
+  if [[ ! -f "$PROGRESS_FILE" ]]; then
+    echo "# Progress: $(date -u +%Y-%m-%d)" > "$PROGRESS_FILE"
+    echo "" >> "$PROGRESS_FILE"
+    echo "## Session: ${SESSION_ID:-unknown}" >> "$PROGRESS_FILE"
+    echo "" >> "$PROGRESS_FILE"
+  else
+    echo "" >> "$PROGRESS_FILE"
+    echo "## Session: ${SESSION_ID:-unknown}" >> "$PROGRESS_FILE"
+    echo "" >> "$PROGRESS_FILE"
+  fi
+  echo "- Branch: $(git -C "$PROJECT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)" >> "$PROGRESS_FILE"
+  echo "- Ended: $(date -u +%H:%M:%S)" >> "$PROGRESS_FILE"
+fi
+
 # --- Push logs/notes directly to main ---
 if [[ -x "$PROJECT_DIR/scripts/utils/push-logs.sh" ]]; then
   bash "$PROJECT_DIR/scripts/utils/push-logs.sh" 2>/dev/null || true

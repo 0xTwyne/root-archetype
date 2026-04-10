@@ -1,0 +1,20 @@
+# Project Knowledge Taxonomy
+# Customize categories for your project domain
+
+categories:
+  - name: architecture
+    description: System design, component boundaries, data flow
+  - name: operations
+    description: Deployment, monitoring, incident response
+  - name: governance
+    description: Agent policies, hook behavior, access control
+  - name: tooling
+    description: Build systems, CI/CD, developer tools
+  - name: research
+    description: Experiments, benchmarks, external findings
+
+# Confidence levels for compiled knowledge
+confidence_levels:
+  - verified    # Confirmed by testing or direct observation
+  - inferred    # Derived from code analysis or pattern matching
+  - external    # From external sources, may need validation
