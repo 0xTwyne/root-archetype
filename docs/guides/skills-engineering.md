@@ -40,16 +40,26 @@ See `.claude/skills/new-skill/references/description-guide.md` for more examples
 
 ## Skill Folder Structure
 
-Every skill is a folder, not a file:
+Skills use a dual-path layout:
 
+**Canonical definition** (engine-neutral, full methodology):
+```
+agents/skills/<skill-name>/
+├── SKILL.md              # Full instructions + gotchas
+├── references/           # Detailed docs read on demand
+├── scripts/              # Executable code
+└── assets/               # Templates, example outputs
+```
+
+**Engine wrapper** (Claude Code discovery, thin pointer):
 ```
 .claude/skills/<skill-name>/
-├── SKILL.md              # Required. Frontmatter + instructions + gotchas
-├── references/           # Optional. Detailed docs Claude reads on demand
-├── scripts/              # Optional. Executable code Claude can run
-└── assets/               # Optional. Templates, example outputs
+└── SKILL.md              # Frontmatter + reference to agents/skills/
 ```
 
+The wrapper just says: `Read and follow the instructions in agents/skills/<name>/SKILL.md`.
+
+See `agents/skills/DISCOVERY.md` for the full skill catalog.
 Use the `new-skill` skill to scaffold correctly.
 
 ## The Gotchas Section
@@ -133,7 +143,9 @@ It checks frontmatter, naming, description quality, gotchas presence, and struct
 
 Use the `new-skill` skill: just say "create a new skill" and follow the prompts. Or manually:
 
-1. Create `.claude/skills/<name>/SKILL.md`
+1. Create canonical definition at `agents/skills/<name>/SKILL.md`
 2. Add YAML frontmatter with name, description
 3. Write instructions and gotchas
-4. Run the validator
+4. Create thin wrapper at `.claude/skills/<name>/SKILL.md`
+5. Add entry to `agents/skills/DISCOVERY.md`
+6. Run the validator
