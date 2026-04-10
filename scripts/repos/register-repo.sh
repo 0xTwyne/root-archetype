@@ -13,9 +13,7 @@ usage() {
     exit 1
 }
 
-if [[ $# -lt 2 ]]; then
-    usage
-fi
+[[ $# -lt 2 ]] && usage
 
 REPO_NAME="$1"
 REPO_PATH="$2"
@@ -39,7 +37,6 @@ if [[ -f "${ROOT_DIR}/scripts/utils/agent_log.sh" ]]; then
 fi
 
 echo "=== Registering repo: ${REPO_NAME} ==="
-echo "Path: ${REPO_PATH}"
 
 # --- Validate path ---
 if [[ ! -d "$REPO_PATH" ]]; then
@@ -53,11 +50,21 @@ if [[ -L "${REPOS_DIR}/${REPO_NAME}" ]]; then
     rm "${REPOS_DIR}/${REPO_NAME}"
 fi
 ln -s "$REPO_PATH" "${REPOS_DIR}/${REPO_NAME}"
-echo "Linked: repos/${REPO_NAME} → ${REPO_PATH}"
+echo "Linked: repos/${REPO_NAME} -> ${REPO_PATH}"
+
+# --- Update AGENT.md repository map ---
+AGENT_MD="${ROOT_DIR}/AGENT.md"
+if [[ -f "$AGENT_MD" ]]; then
+    ROW="| ${REPO_NAME} | \`${REPO_PATH}\` | ${PURPOSE:-(configure purpose)} |"
+    if ! grep -qF "| ${REPO_NAME} |" "$AGENT_MD" 2>/dev/null; then
+        # Append row after the repo map header
+        sed -i "/{{REPO_MAP_ROWS}}/a\\${ROW}" "$AGENT_MD" 2>/dev/null || \
+        sed -i "/^|.*Path.*Purpose/a\\${ROW}" "$AGENT_MD" 2>/dev/null || true
+    fi
+fi
 
 # --- Seed agent files if missing ---
 if [[ -d "$REPO_PATH" ]]; then
-    # Seed CLAUDE.md if missing
     if [[ ! -f "${REPO_PATH}/CLAUDE.md" ]]; then
         cat > "${REPO_PATH}/CLAUDE.md" << CLAUDE_EOF
 # ${REPO_NAME}
@@ -74,64 +81,39 @@ CLAUDE_EOF
         echo "Seeded: ${REPO_PATH}/CLAUDE.md"
     fi
 
-    # Seed .claude/settings.json if missing
-    if [[ ! -f "${REPO_PATH}/.claude/settings.json" ]]; then
-        mkdir -p "${REPO_PATH}/.claude"
-        cat > "${REPO_PATH}/.claude/settings.json" << SETTINGS_EOF
-{
-  "hooks": {
-    "PreToolUse": []
-  }
-}
-SETTINGS_EOF
-        echo "Seeded: ${REPO_PATH}/.claude/settings.json"
-    fi
-
-    # Seed agents directory if missing
     if [[ ! -d "${REPO_PATH}/agents" ]]; then
         mkdir -p "${REPO_PATH}/agents"
         cat > "${REPO_PATH}/agents/developer.md" << AGENT_EOF
 # Developer
 
 ## Mission
-
 General development work for ${REPO_NAME}.
 
 ## Use This Role When
-
 - Implementing features or fixes in this repo
-- Reviewing or refactoring code
 
 ## Inputs Required
-
 - Task description or issue reference
-- Relevant codebase context
 
 ## Outputs
-
 - Code changes with tests
-- Documentation updates
 
 ## Workflow
-
 1. Understand the task
-2. Implement changes
-3. Test and verify
-4. Document
+2. Implement and test
+3. Document
 
 ## Guardrails
-
 - Follow project code style
 - Run tests before committing
-- Keep changes focused
 AGENT_EOF
         echo "Seeded: ${REPO_PATH}/agents/developer.md"
+    else
+        echo "Agent files already exist in ${REPO_PATH}/agents/"
     fi
 fi
 
-echo ""
-echo "Repo '${REPO_NAME}' registered successfully."
-echo "Run 'scripts/repos/scan-agents.sh' to rebuild the unified agent registry."
+echo "Repo '${REPO_NAME}' registered."
 
 if type agent_task_end &>/dev/null; then
     agent_task_end "Register repo: ${REPO_NAME}" "success"

@@ -110,6 +110,13 @@ if [[ -f "$FACTS_FILE" ]] && [[ -s "$FACTS_FILE" ]]; then
 fi
 
 
+# --- Guided init detection ---
+if [[ -f "$PROJECT_DIR/.needs-init" ]]; then
+  STEPS="$(jq -r '.steps_remaining | join(", ")' "$PROJECT_DIR/.needs-init" 2>/dev/null || echo "unknown")"
+  CONTEXT+="This project needs initial setup. Remaining steps: $STEPS\n"
+  CONTEXT+="Run the init-wizard skill to complete guided setup.\n"
+fi
+
 # --- Stale wiki detection ---
 if [[ -f "$PROJECT_DIR/knowledge/research/.last_compile" ]]; then
   NEWEST_SOURCE="$(find "$PROJECT_DIR/logs/progress" "$PROJECT_DIR/notes" -name '*.md' -newer "$PROJECT_DIR/knowledge/research/.last_compile" 2>/dev/null | head -1)"

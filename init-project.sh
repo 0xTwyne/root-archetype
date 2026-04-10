@@ -2,318 +2,171 @@
 set -euo pipefail
 
 # Root-Archetype Project Initializer
-# Usage: ./init-project.sh <project-name> <project-root> [--repos "name:path,name:path"]
+# Usage: ./init-project.sh <project-name> <target-path> [--guided] [--repos "n:p,..."] [--email "x"]
 
 usage() {
-    echo "Usage: $0 <project-name> <project-root> [--repos \"name:path,name:path\"] [--email \"user@example.com\"]"
+    echo "Usage: $0 <project-name> <target-path> [options]"
     echo ""
-    echo "  project-name   Short identifier (e.g., my-project)"
-    echo "  project-root   Absolute path where the root repo will be created"
-    echo "  --repos        Comma-separated child repos to register (name:path pairs)"
-    echo "  --email        Maintainer email for the seeded project"
+    echo "Options:"
+    echo "  --guided   Drop .needs-init marker for interactive wizard"
+    echo "  --repos    Comma-separated child repos (name:path pairs)"
+    echo "  --email    Maintainer email"
     echo ""
-    echo "Example:"
-    echo "  $0 my-project /tmp/test --repos \"app:/tmp/app,lib:/tmp/lib\" --email \"dev@example.com\""
+    echo "Example: $0 my-project /tmp/test --repos \"app:/tmp/app\" --email \"dev@co.com\""
     exit 1
 }
 
-if [[ $# -lt 2 ]]; then
-    usage
-fi
+[[ $# -lt 2 ]] && usage
 
 PROJECT_NAME="$1"
 PROJECT_ROOT="$2"
 shift 2
 
-REPOS=""
-MAINTAINER_EMAIL=""
+REPOS="" MAINTAINER_EMAIL="" GUIDED=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --repos)
-            REPOS="$2"
-            shift 2
-            ;;
-        --email)
-            MAINTAINER_EMAIL="$2"
-            shift 2
-            ;;
-        *)
-            echo "Unknown option: $1"
-            usage
-            ;;
+        --guided) GUIDED=true; shift ;;
+        --repos) REPOS="$2"; shift 2 ;;
+        --email) MAINTAINER_EMAIL="$2"; shift 2 ;;
+        *) echo "Unknown: $1"; usage ;;
     esac
 done
 
 ARCHETYPE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== Root-Archetype Project Initializer ==="
-echo "Project:  ${PROJECT_NAME}"
-echo "Root:     ${PROJECT_ROOT}"
-echo "Email:    ${MAINTAINER_EMAIL:-not set}"
-echo "Repos:    ${REPOS:-none}"
-echo ""
+echo "Project: ${PROJECT_NAME} | Root: ${PROJECT_ROOT} | Mode: $([[ $GUIDED == true ]] && echo guided || echo quick)"
 
-# --- Create project directory ---
-if [[ -d "${PROJECT_ROOT}" ]]; then
-    echo "WARNING: ${PROJECT_ROOT} already exists. Merging into existing directory."
-else
-    mkdir -p "${PROJECT_ROOT}"
-fi
-
-# --- Initialize git if needed ---
+# --- Create project and init git ---
+mkdir -p "${PROJECT_ROOT}"
 if [[ ! -d "${PROJECT_ROOT}/.git" ]]; then
-    git init "${PROJECT_ROOT}"
-    cd "${PROJECT_ROOT}"
-    git checkout -b main 2>/dev/null || true
-else
-    cd "${PROJECT_ROOT}"
+    git init "${PROJECT_ROOT}" >/dev/null
+    git -C "${PROJECT_ROOT}" checkout -b main 2>/dev/null || true
 fi
+cd "${PROJECT_ROOT}"
 
-# --- Copy archetype structure ---
-echo "Copying archetype structure..."
-
-# Directories
-mkdir -p agents/shared agents/roles
-mkdir -p scripts/{hooks,validate,session,utils,repos}
-mkdir -p .claude/{commands,skills}
-mkdir -p notes
-mkdir -p docs/guides
-mkdir -p .devcontainer
-mkdir -p logs
-mkdir -p knowledge/{wiki,research}
-mkdir -p local
-mkdir -p repos
-mkdir -p secrets
-
-# --- Template substitution function ---
+# --- Template substitution ---
 substitute() {
-    local file="$1"
-    sed -i \
-        -e "s|{{PROJECT_NAME}}|${PROJECT_NAME}|g" \
-        -e "s|{{PROJECT_ROOT}}|${PROJECT_ROOT}|g" \
-        -e "s|{{MAINTAINER_EMAIL}}|${MAINTAINER_EMAIL}|g" \
-        "$file"
+    sed -i -e "s|{{PROJECT_NAME}}|${PROJECT_NAME}|g" \
+           -e "s|{{PROJECT_ROOT}}|${PROJECT_ROOT}|g" \
+           -e "s|{{MAINTAINER_EMAIL}}|${MAINTAINER_EMAIL}|g" "$1"
 }
 
-# --- Copy and substitute template files ---
-copy_and_sub() {
-    local src="$1"
-    local dst="$2"
-    if [[ -f "${ARCHETYPE_DIR}/${src}" ]]; then
-        cp "${ARCHETYPE_DIR}/${src}" "${dst}"
-        substitute "${dst}"
-    fi
+# --- Copy directory tree (files only, preserving structure) ---
+copy_tree() {
+    local src="$1" dst="$2"
+    [[ -d "$src" ]] || return 0
+    find "$src" -type f | while read -r f; do
+        local rel="${f#$src/}"
+        mkdir -p "$(dirname "${dst}/${rel}")"
+        cp "$f" "${dst}/${rel}"
+    done
 }
 
-# Core governance files
-copy_and_sub "AGENT.md" "AGENT.md"
-copy_and_sub "CLAUDE.md" "CLAUDE.md"
-copy_and_sub "CODEX.md" "CODEX.md"
-copy_and_sub "README.md" "README.md"
+# --- Copy and substitute a single file ---
+copy_sub() {
+    local src="${ARCHETYPE_DIR}/$1" dst="$2"
+    [[ -f "$src" ]] || return 0
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+    substitute "$dst"
+}
 
-# Agent system
-for f in "${ARCHETYPE_DIR}"/agents/roles/*.md; do
-    [[ -f "$f" ]] && cp "$f" "agents/roles/$(basename "$f")"
-done
-for f in "${ARCHETYPE_DIR}"/agents/*.md; do
-    [[ -f "$f" ]] && cp "$f" "agents/$(basename "$f")"
-done
-for f in "${ARCHETYPE_DIR}"/agents/shared/*.md; do
-    [[ -f "$f" ]] && cp "$f" "agents/shared/$(basename "$f")"
-done
+# --- Create directory structure ---
+mkdir -p agents/{shared,roles,skills} scripts/{hooks,validate,session,utils,repos} \
+         .claude/skills notes knowledge/{wiki,research/deep-dives} logs local repos secrets .devcontainer
 
-# Hooks (all copied, user enables via settings.json)
-for f in "${ARCHETYPE_DIR}"/scripts/hooks/*.sh; do
-    [[ -f "$f" ]] && cp "$f" "scripts/hooks/$(basename "$f")" && chmod +x "scripts/hooks/$(basename "$f")"
+# --- Copy core governance files ---
+for f in AGENT.md CLAUDE.md CODEX.md README.md MAINTAINERS.json .gitignore; do
+    copy_sub "$f" "$f"
 done
 
-# Validators
-for f in "${ARCHETYPE_DIR}"/scripts/validate/*; do
-    [[ -f "$f" ]] && cp "$f" "scripts/validate/$(basename "$f")"
-done
-chmod +x scripts/validate/*.py 2>/dev/null || true
+# --- Copy agent system ---
+copy_tree "${ARCHETYPE_DIR}/agents" agents
 
-# Session management
-for f in "${ARCHETYPE_DIR}"/scripts/session/*.sh; do
-    [[ -f "$f" ]] && cp "$f" "scripts/session/$(basename "$f")" && chmod +x "scripts/session/$(basename "$f")"
-done
+# --- Copy scripts ---
+copy_tree "${ARCHETYPE_DIR}/scripts/hooks" scripts/hooks
+copy_tree "${ARCHETYPE_DIR}/scripts/validate" scripts/validate
+copy_tree "${ARCHETYPE_DIR}/scripts/session" scripts/session
+copy_tree "${ARCHETYPE_DIR}/scripts/utils" scripts/utils
+copy_tree "${ARCHETYPE_DIR}/scripts/repos" scripts/repos
+chmod +x scripts/hooks/*.sh scripts/validate/*.py scripts/session/*.sh \
+         scripts/utils/*.sh scripts/repos/*.sh 2>/dev/null || true
 
-# Utils
-for f in "${ARCHETYPE_DIR}"/scripts/utils/*.sh; do
-    [[ -f "$f" ]] && cp "$f" "scripts/utils/$(basename "$f")" && chmod +x "scripts/utils/$(basename "$f")"
-done
+# --- Copy Claude Code config ---
+copy_sub ".claude/settings.json" ".claude/settings.json"
+copy_tree "${ARCHETYPE_DIR}/.claude/skills" .claude/skills
+copy_tree "${ARCHETYPE_DIR}/.claude/hooks" .claude/hooks
+chmod +x .claude/hooks/*.sh 2>/dev/null || true
 
-# Repo management
-for f in "${ARCHETYPE_DIR}"/scripts/repos/*.sh; do
-    [[ -f "$f" ]] && cp "$f" "scripts/repos/$(basename "$f")" && chmod +x "scripts/repos/$(basename "$f")"
-done
+# --- Copy supporting files ---
+copy_sub ".devcontainer/devcontainer.json" ".devcontainer/devcontainer.json"
+copy_sub "secrets/.secretpaths" "secrets/.secretpaths"
+copy_sub "notes/README.md" "notes/README.md"
+copy_sub "knowledge/taxonomy.yaml" "knowledge/taxonomy.yaml"
+copy_sub "knowledge/research/intake_index.yaml" "knowledge/research/intake_index.yaml"
 
-# Claude Code config
-copy_and_sub ".claude/settings.json" ".claude/settings.json" 2>/dev/null || true
-for f in "${ARCHETYPE_DIR}"/.claude/commands/*.md; do
-    [[ -f "$f" ]] && cp "$f" ".claude/commands/$(basename "$f")"
-done
+# --- Gitkeep empty dirs ---
+touch knowledge/wiki/.gitkeep knowledge/research/.gitkeep \
+      knowledge/research/deep-dives/.gitkeep logs/.gitkeep \
+      local/.gitkeep repos/.gitkeep secrets/.gitkeep
 
-# Skills (copy all surviving skills)
-for skill_dir in "${ARCHETYPE_DIR}"/.claude/skills/*/; do
-    [[ -d "$skill_dir" ]] || continue
-    skill_name="$(basename "$skill_dir")"
-    mkdir -p ".claude/skills/${skill_name}"
-    for f in "${skill_dir}"*; do
-        [[ -f "$f" ]] && cp "$f" ".claude/skills/${skill_name}/$(basename "$f")"
-    done
-    # Copy subdirectories (references/, scripts/, assets/)
-    for subdir in references scripts assets; do
-        if [[ -d "${skill_dir}${subdir}" ]]; then
-            mkdir -p ".claude/skills/${skill_name}/${subdir}"
-            for f in "${skill_dir}${subdir}/"*; do
-                [[ -f "$f" ]] && cp "$f" ".claude/skills/${skill_name}/${subdir}/$(basename "$f")"
-            done
-        fi
-    done
-done
-
-# Hook library and policy hooks
-mkdir -p .claude/hooks/lib
-for f in "${ARCHETYPE_DIR}"/.claude/hooks/*.sh; do
-    [[ -f "$f" ]] && cp "$f" ".claude/hooks/$(basename "$f")" && chmod +x ".claude/hooks/$(basename "$f")"
-done
-for f in "${ARCHETYPE_DIR}"/.claude/hooks/lib/*; do
-    [[ -f "$f" ]] && cp "$f" ".claude/hooks/lib/$(basename "$f")"
-done
-
-# Secrets protection
-cp "${ARCHETYPE_DIR}/secrets/.secretpaths" "secrets/.secretpaths"
-touch "secrets/.gitkeep"
-
-# Gitkeep files
-touch knowledge/wiki/.gitkeep knowledge/research/.gitkeep local/.gitkeep repos/.gitkeep
-
-# Devcontainer
-copy_and_sub ".devcontainer/devcontainer.json" ".devcontainer/devcontainer.json" 2>/dev/null || true
-
-# Maintainers config (required by tamper-proofing hook)
-if [[ -f "${ARCHETYPE_DIR}/MAINTAINERS.json" ]]; then
-    cp "${ARCHETYPE_DIR}/MAINTAINERS.json" "MAINTAINERS.json"
-    substitute "MAINTAINERS.json"
-fi
-
-# --- Build repo map rows for CLAUDE.md ---
+# --- Build repo map and register ---
 REPO_MAP_ROWS=""
 if [[ -n "$REPOS" ]]; then
-    echo "Registering child repos..."
     IFS=',' read -ra REPO_PAIRS <<< "$REPOS"
     for pair in "${REPO_PAIRS[@]}"; do
         IFS=':' read -r name path <<< "$pair"
-        name=$(echo "$name" | xargs)
-        path=$(echo "$path" | xargs)
-        REPO_MAP_ROWS="${REPO_MAP_ROWS}| ${name} | \`${path}\` | (configure purpose) |\n"
+        name=$(echo "$name" | xargs); path=$(echo "$path" | xargs)
+        REPO_MAP_ROWS+="| ${name} | \`${path}\` | (configure purpose) |\\n"
+        [[ -x scripts/repos/register-repo.sh ]] && \
+            bash scripts/repos/register-repo.sh "$name" "$path" 2>/dev/null || true
     done
-    # Substitute repo map into CLAUDE.md
-    sed -i "s|{{REPO_MAP_ROWS}}|${REPO_MAP_ROWS}|g" CLAUDE.md
+    sed -i "s|{{REPO_MAP_ROWS}}|${REPO_MAP_ROWS}|g" AGENT.md 2>/dev/null || true
 else
-    sed -i '/{{REPO_MAP_ROWS}}/d' CLAUDE.md
-fi
-
-# --- Register child repos ---
-if [[ -n "$REPOS" ]]; then
-    IFS=',' read -ra REPO_PAIRS <<< "$REPOS"
-    for pair in "${REPO_PAIRS[@]}"; do
-        IFS=':' read -r name path <<< "$pair"
-        name=$(echo "$name" | xargs)
-        path=$(echo "$path" | xargs)
-        if [[ -x "scripts/repos/register-repo.sh" ]]; then
-            bash scripts/repos/register-repo.sh "$name" "$path" || echo "WARNING: Could not register ${name}"
-        fi
-    done
+    sed -i '/{{REPO_MAP_ROWS}}/d' AGENT.md 2>/dev/null || true
 fi
 
 # --- Write archetype manifest ---
-ARCHETYPE_VERSION=$(cd "${ARCHETYPE_DIR}" && git rev-parse HEAD 2>/dev/null || echo "unknown")
 cat > .archetype-manifest.json << MANEOF
 {
   "archetype_origin": "${ARCHETYPE_DIR}",
-  "archetype_version": "${ARCHETYPE_VERSION}",
+  "archetype_version": "$(cd "${ARCHETYPE_DIR}" && git rev-parse HEAD 2>/dev/null || echo unknown)",
   "init_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "template_values": {
     "PROJECT_NAME": "${PROJECT_NAME}",
     "PROJECT_ROOT": "${PROJECT_ROOT}",
     "MAINTAINER_EMAIL": "${MAINTAINER_EMAIL}"
-  },
-  "portable_paths": [
-    "scripts/hooks/",
-    "scripts/validate/",
-    "scripts/utils/",
-    "scripts/session/",
-    "scripts/repos/",
-    "agents/shared/",
-    "agents/roles/",
-    "agents/*.md",
-    ".claude/commands/",
-    ".claude/skills/",
-    "secrets/.secretpaths"
-  ],
-  "templated_files": [
-    "CLAUDE.md",
-    "README.md"
-  ]
+  }
 }
 MANEOF
 
-# --- Create .gitignore ---
-copy_and_sub ".gitignore" ".gitignore" 2>/dev/null || true
+# --- Guided mode: drop .needs-init marker ---
+if [[ "$GUIDED" == true ]]; then
+    cat > .needs-init << INITEOF
+{
+  "project_name": "${PROJECT_NAME}",
+  "created": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "init_mode": "guided",
+  "steps_remaining": ["repos", "child-agents", "maintainer", "hooks", "knowledge", "roles"]
+}
+INITEOF
+    echo ""
+    echo "Guided mode: .needs-init marker created."
+    echo "Start a Claude or Codex session to complete setup with the init wizard."
+fi
 
 # --- Post-init validation ---
 echo ""
-echo "Running post-init validation..."
-VALIDATION_FAILED=0
-
-# Check required structure
-for d in agents agents/shared agents/roles scripts/hooks scripts/validate scripts/session scripts/utils \
-         notes .claude/commands .claude/skills; do
-    if [[ ! -d "$d" ]]; then
-        echo "  WARN: Missing directory: $d"
-        VALIDATION_FAILED=1
-    fi
+WARN=0
+for d in agents scripts/hooks .claude/skills; do
+    [[ -d "$d" ]] || { echo "  WARN: Missing $d"; WARN=1; }
 done
-
-for f in CLAUDE.md AGENT.md .claude/settings.json MAINTAINERS.json .archetype-manifest.json; do
-    if [[ ! -f "$f" ]]; then
-        echo "  WARN: Missing file: $f"
-        VALIDATION_FAILED=1
-    fi
+for f in AGENT.md CLAUDE.md .claude/settings.json MAINTAINERS.json; do
+    [[ -f "$f" ]] || { echo "  WARN: Missing $f"; WARN=1; }
 done
-
-# Sandbox prerequisite check
-if ! command -v bwrap &>/dev/null; then
-    echo "  WARN: bubblewrap (bwrap) not installed. Sandbox will not work."
-    echo "  Install: sudo apt install bubblewrap (Debian/Ubuntu)"
-    echo "  Without sandbox, hooks cannot enforce OS-level read/write restrictions."
-    VALIDATION_FAILED=1
-fi
-
-# Run validators if Python available
-if command -v python3 &>/dev/null; then
-    python3 scripts/validate/validate_agents_structure.py 2>/dev/null || VALIDATION_FAILED=1
-    python3 scripts/validate/validate_agents_references.py 2>/dev/null || VALIDATION_FAILED=1
-    python3 scripts/validate/validate_claude_md_consistency.py 2>/dev/null || VALIDATION_FAILED=1
-    python3 scripts/validate/validate_document_drift.py 2>/dev/null || VALIDATION_FAILED=1
-fi
-
-if [[ $VALIDATION_FAILED -eq 0 ]]; then
-    echo "Post-init validation passed"
-else
-    echo "Post-init validation completed with warnings (see above)"
-fi
+[[ $WARN -eq 0 ]] && echo "Validation passed." || echo "Validation completed with warnings."
 
 echo ""
 echo "=== Project initialized: ${PROJECT_NAME} ==="
-echo "Root: ${PROJECT_ROOT}"
-echo ""
-echo "Next steps:"
-echo "  1. Review and customize CLAUDE.md"
-echo "  2. Configure hooks in .claude/settings.json"
-echo "  3. Add agent roles in agents/roles/"
-echo "  4. Register child repos: scripts/repos/register-repo.sh <name> <path>"
-echo "  5. Install bubblewrap for sandbox: sudo apt install bubblewrap"
-echo "  6. Review secrets/.secretpaths and add project-specific protected paths"
+echo "Next: review AGENT.md, configure hooks, register child repos."

@@ -10,6 +10,7 @@ Catalog of all available skills with trigger conditions.
 | new-handoff | `agents/skills/new-handoff/` | "new handoff", "create handoff", "track work item" | Handoff document creation |
 | project-wiki | `agents/skills/project-wiki/` | "lint KB", "check KB health", "what do we know about", "compile wiki" | Wiki compilation and maintenance |
 | research-intake | `agents/skills/research-intake/` | "research intake", "ingest this", "add to knowledge base" | Ingest external sources into structured KB |
+| init-wizard | `agents/skills/init-wizard/` | `.needs-init` detected by session-start hook | Guided project initialization wizard |
 
 ## Engine-Specific Discovery
 
