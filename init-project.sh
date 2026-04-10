@@ -188,13 +188,10 @@ if [[ -d "${ARCHETYPE_DIR}/.claude/skills/project-wiki" ]]; then
 fi
 
 
-# Hook library and policy hooks
-mkdir -p .claude/hooks/lib
-for f in "${ARCHETYPE_DIR}"/.claude/hooks/*.sh; do
-    [[ -f "$f" ]] && cp "$f" ".claude/hooks/$(basename "$f")" && chmod +x ".claude/hooks/$(basename "$f")"
-done
-for f in "${ARCHETYPE_DIR}"/.claude/hooks/lib/*; do
-    [[ -f "$f" ]] && cp "$f" ".claude/hooks/lib/$(basename "$f")"
+# Hook library (shared utilities and secret patterns)
+mkdir -p scripts/hooks/lib
+for f in "${ARCHETYPE_DIR}"/scripts/hooks/lib/*; do
+    [[ -f "$f" ]] && cp "$f" "scripts/hooks/lib/$(basename "$f")"
 done
 
 # Wiki structure (wiki.yaml + SCHEMA.md scaffold)

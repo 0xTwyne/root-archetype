@@ -6,7 +6,7 @@ set -euo pipefail
 # Purpose: Run build/lint/typecheck when agent signals completion.
 #          Exit 0 = silent success. Exit 2 = re-engage agent with errors.
 #
-# Usage: Copy to .claude/hooks/, replace {{placeholders}}, register in settings.json.
+# Usage: Copy to scripts/hooks/, replace {{placeholders}}, register in settings.json.
 
 # --- Configuration (replace these) ---
 BUILD_CMD="{{BUILD_CMD}}"       # e.g., "npm run build", "cargo build", "go build ./..."

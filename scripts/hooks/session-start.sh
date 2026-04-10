@@ -2,7 +2,7 @@
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)}"
-source "$PROJECT_DIR/.claude/hooks/lib/hook-utils.sh" 2>/dev/null || true
+source "$PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
 
 set -euo pipefail
 

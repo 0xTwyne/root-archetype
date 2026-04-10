@@ -54,7 +54,7 @@ bash .claude/skills/safe-commit/scripts/check-branch.sh
 
 ## Gotchas
 
-- This skill reuses `.claude/hooks/lib/secret-patterns.txt` — do not duplicate patterns into a separate file
+- This skill reuses `scripts/hooks/lib/secret-patterns.txt` — do not duplicate patterns into a separate file
 - The staged-diff scan only catches secrets in the diff output, not in unchanged parts of staged files — it complements, not replaces, the existing pre-edit hooks
 - Branch protection is a warning, not a block — there are legitimate reasons to commit to main (e.g., CI fixes, sole-maintainer repos)
 - If you add new secret patterns, add them to the shared `secret-patterns.txt` so all hooks benefit

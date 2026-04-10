@@ -11,7 +11,7 @@ set -euo pipefail
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
 # --- Source hook utilities ---
-HOOK_LIB="${PROJECT_DIR}/.claude/hooks/lib/hook-utils.sh"
+HOOK_LIB="${PROJECT_DIR}/scripts/hooks/lib/hook-utils.sh"
 if [[ -f "$HOOK_LIB" ]]; then
     source "$HOOK_LIB"
 else

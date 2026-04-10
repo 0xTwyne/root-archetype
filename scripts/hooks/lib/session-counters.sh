@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Session-scoped counters for threshold-based hook behavior.
-# Usage: source ".claude/hooks/lib/session-counters.sh"
+# Usage: source "scripts/hooks/lib/session-counters.sh"
 
 _SESSION_COUNTER_FILE="/tmp/archetype-session-counters-${SESSION_ID:-${PPID:-$$}}.json"
 

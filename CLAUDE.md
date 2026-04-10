@@ -18,12 +18,12 @@ See `.claude/dependency-map.json` for formal coupling edges between repos.
 ## Governance Infrastructure
 
 ### Hooks (`scripts/hooks/`)
-Pre/post tool-use hooks for Claude Code sessions:
-- Filesystem path safety (`check_filesystem_path.sh`)
-- Agent schema validation (`agents_schema_guard.sh`)
-- Agent reference validation (`agents_reference_guard.sh`)
-- Test safety (`check_test_safety.sh`)
-- Skill usage logging (`skill_usage_log.sh`)
+All Claude Code hooks consolidated in one directory:
+- Session lifecycle: `session-start.sh`, `session-end.sh`, `subagent-start.sh`
+- Policy guards: `pre-edit-guard.sh`, `post-edit-check.sh`, `check_filesystem_path.sh`, `check_secrets_read.sh`
+- Validation: `agents_schema_guard.sh`, `agents_reference_guard.sh`, `check_test_safety.sh`
+- Observability: `post-tool-use-audit.sh`, `skill_usage_log.sh`, `correction-detection.sh`
+- Shared lib: `lib/hook-utils.sh`, `lib/session-counters.sh`, `lib/secret-patterns.txt`
 
 ### Secrets Protection (`secrets/`)
 Convention for sensitive data that must never be read by AI agents:

@@ -9,7 +9,7 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)}"
 DEP_MAP="$PROJECT_DIR/.claude/dependency-map.json"
 TOOLCHAINS="$PROJECT_DIR/.claude/repo-toolchains.json"
 
-source "$PROJECT_DIR/.claude/hooks/lib/hook-utils.sh" 2>/dev/null || true
+source "$PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
 trap 'hook_fail_open "post-edit-check" "unexpected error"' ERR
 
 INPUT="$(cat)"
@@ -72,7 +72,7 @@ if [[ -f "$TOOLCHAINS" ]]; then
       fi
 
       if [[ -n "$ISSUES" ]]; then
-        source "$PROJECT_DIR/.claude/hooks/lib/session-counters.sh"
+        source "$PROJECT_DIR/scripts/hooks/lib/session-counters.sh"
         EDIT_COUNT="$(session_counter_increment "lint-$REPO_NAME")"
         add_context "LINT WARNING in $REPO_REL_PATH:\n$ISSUES\nFix ALL lint/format violations in files you touch."
       fi

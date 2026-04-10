@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/../../..")"
-PATTERNS_FILE="$REPO_ROOT/.claude/hooks/lib/secret-patterns.txt"
+PATTERNS_FILE="$REPO_ROOT/scripts/hooks/lib/secret-patterns.txt"
 
 if [[ ! -f "$PATTERNS_FILE" ]]; then
   echo "WARN: Secret patterns file not found at $PATTERNS_FILE"

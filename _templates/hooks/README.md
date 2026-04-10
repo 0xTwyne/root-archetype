@@ -21,7 +21,7 @@ Exit 0 on success is critical: silent success keeps agent context clean. Only fa
 
 ## Installation
 
-1. Copy template to `.claude/hooks/` in your project
+1. Copy template to `scripts/hooks/` in your project
 2. Replace `{{placeholders}}` with project-specific commands
 3. Register in `.claude/settings.json`:
 
@@ -29,7 +29,7 @@ Exit 0 on success is critical: silent success keeps agent context clean. Only fa
 {
   "hooks": {
     "Stop": [
-      { "command": "bash .claude/hooks/poststop_verify.sh" }
+      { "command": "bash scripts/hooks/poststop_verify.sh" }
     ]
   }
 }

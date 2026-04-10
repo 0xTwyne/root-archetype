@@ -18,7 +18,7 @@ Must exist at the root of any instance repo before `/upstream` can work.
     "agents/",
     "swarm/",
     ".claude/skills/",
-    ".claude/hooks/",
+    "scripts/hooks/",
     ".claude/commands/"
   ],
   "templated_files": [
