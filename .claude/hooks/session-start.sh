@@ -110,6 +110,36 @@ if [[ -f "$FACTS_FILE" ]] && [[ -s "$FACTS_FILE" ]]; then
 fi
 
 # --- Structural invariant check ---
+
+# --- Check registered repos for agent diffs ---
+DEP_MAP="$PROJECT_DIR/.claude/dependency-map.json"
+AGENT_DIFFS=""
+if [[ -f "$DEP_MAP" ]]; then
+  while IFS='|' read -r name path; do
+    [[ -d "$path/.git" ]] || continue
+    GIT_TERMINAL_PROMPT=0 git -C "$path" fetch origin main 2>/dev/null || continue
+    DIFF_FILES="$(git -C "$path" diff --name-only HEAD..origin/main -- "CLAUDE.md" ".claude/" 2>/dev/null || true)"
+    if [[ -n "$DIFF_FILES" ]]; then
+      while IFS= read -r df; do
+        [[ -z "$df" ]] && continue
+        AGENT_DIFFS+="  - [$name] $df (remote has updates)\n"
+      done <<< "$DIFF_FILES"
+    fi
+  done < <(jq -r '.repos | to_entries[] | "\(.key)|\(.value.path)"' "$DEP_MAP" 2>/dev/null || true)
+fi
+
+if [[ -n "$AGENT_DIFFS" ]]; then
+  CONTEXT+="\nAGENT FILE UPDATES on remote:\n$AGENT_DIFFS"
+fi
+
+# --- Stale wiki detection ---
+if [[ -f "$PROJECT_DIR/knowledge/research/.last_compile" ]]; then
+  NEWEST_SOURCE="$(find "$PROJECT_DIR/logs/progress" "$PROJECT_DIR/notes" -name '*.md' -newer "$PROJECT_DIR/knowledge/research/.last_compile" 2>/dev/null | head -1)"
+  if [[ -n "$NEWEST_SOURCE" ]]; then
+    CONTEXT+="Knowledge base may be stale. Run /project-wiki to update.\n"
+  fi
+fi
+
 if [[ -x "$PROJECT_DIR/scripts/validate/validate_agents_structure.py" ]]; then
   if ! python3 "$PROJECT_DIR/scripts/validate/validate_agents_structure.py" &>/dev/null; then
     CONTEXT+="\nWARNING: Agent structure validation has failures. Run: python3 scripts/validate/validate_agents_structure.py\n"

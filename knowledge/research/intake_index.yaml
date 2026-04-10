@@ -1,0 +1,5 @@
+# Research Intake Index
+# Tracks deduplicated research sources to prevent re-processing
+# Format: URL or source identifier -> metadata
+
+entries: []

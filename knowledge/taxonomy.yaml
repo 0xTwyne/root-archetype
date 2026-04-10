@@ -1,0 +1,16 @@
+# Project Knowledge Taxonomy
+# Customize categories for your project domain
+
+categories:
+  - name: architecture
+    description: System design decisions and patterns
+  - name: operations
+    description: Deployment, monitoring, incident response
+  - name: domain
+    description: Business domain concepts and rules
+  - name: tooling
+    description: Development tools, CI/CD, infrastructure
+  - name: security
+    description: Security policies, threat models, access patterns
+
+# Add project-specific categories below
