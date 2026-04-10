@@ -28,7 +28,10 @@ REQUIRED_DIRS = [
 
 # Files that should always exist
 REQUIRED_FILES = [
+    "AGENT.md",
     "CLAUDE.md",
+    "CODEX.md",
+    "MAINTAINERS.json",
     ".claude/settings.json",
 ]
 
@@ -48,6 +51,23 @@ def check_required_structure() -> list[str]:
 def check_handoff_status_consistency() -> list[str]:
     """Check handoff files are in the right directory for their status."""
     errors = []
+    # Check per-user handoff directories (notes/<user>/handoffs/)
+    notes_dir = REPO_ROOT / "notes"
+    if not notes_dir.exists():
+        return errors
+    for user_dir in notes_dir.iterdir():
+        if not user_dir.is_dir() or user_dir.name in ("handoffs",):
+            continue
+        handoffs_dir = user_dir / "handoffs"
+        if not handoffs_dir.is_dir():
+            continue
+        for f in handoffs_dir.glob("*.md"):
+            content = f.read_text()
+            match = re.search(r'\*\*Status\*\*:\s*(.+)', content)
+            if match:
+                declared = match.group(1).strip().lower()
+
+    # Also check legacy handoffs/ directory if it still exists
     for status_dir in ["active", "blocked", "completed", "archived"]:
         hdir = REPO_ROOT / "handoffs" / status_dir
         if not hdir.exists():
@@ -86,16 +106,18 @@ def check_settings_hooks_exist() -> list[str]:
         for event_name, event_hooks in hooks.items():
             if not isinstance(event_hooks, list):
                 continue
-            for hook in event_hooks:
-                cmd = hook.get("command", "") if isinstance(hook, dict) else ""
-                # Extract script paths from command
-                for token in cmd.split():
-                    if token.endswith(".sh"):
-                        path = REPO_ROOT / token
-                        if not path.exists():
-                            errors.append(
-                                f"settings.json hook '{event_name}' references missing script: {token}"
-                            )
+            for group in event_hooks:
+                if not isinstance(group, dict):
+                    continue
+                for hook in group.get("hooks", []):
+                    cmd = hook.get("command", "") if isinstance(hook, dict) else ""
+                    for token in cmd.split():
+                        if token.endswith(".sh"):
+                            path = REPO_ROOT / token
+                            if not path.exists():
+                                errors.append(
+                                    f"settings.json hook '{event_name}' references missing script: {token}"
+                                )
     except (json.JSONDecodeError, AttributeError):
         errors.append("settings.json: could not parse hooks section")
     return errors

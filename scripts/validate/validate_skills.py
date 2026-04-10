@@ -17,7 +17,9 @@ import re
 import sys
 from pathlib import Path
 
-SKILLS_DIR = Path(__file__).resolve().parents[2] / ".claude" / "skills"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
+CANONICAL_SKILLS_DIR = REPO_ROOT / "agents" / "skills"
 KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 TOOL_PATTERN_RE = re.compile(r"^[A-Za-z]+\(.*\)$")
 TRIGGER_PHRASES = ["Use when", "Trigger when", "TRIGGER when", "Do NOT use"]
@@ -56,6 +58,17 @@ def validate_skill(skill_dir):
 
     text = skill_md.read_text(encoding="utf-8")
 
+    # Detect thin wrapper pattern — defer content checks to canonical file
+    is_wrapper = "agents/skills/" in text and "Read and follow" in text
+    canonical_text = ""
+    if is_wrapper:
+        canonical = CANONICAL_SKILLS_DIR / name / "SKILL.md"
+        if canonical.exists():
+            canonical_text = canonical.read_text(encoding="utf-8")
+        else:
+            issues.append(("ERROR", f"Wrapper references agents/skills/{name}/SKILL.md but file not found"))
+            return issues
+
     # Check frontmatter
     fm, body = parse_frontmatter(text)
     if fm is None:
@@ -91,9 +104,10 @@ def validate_skill(skill_dir):
             if tool_spec and not TOOL_PATTERN_RE.match(tool_spec):
                 issues.append(("ERROR", f"allowed-tools entry '{tool_spec}' doesn't match Tool(pattern) format"))
 
-    # Check for Gotchas section
+    # Check for Gotchas section (in canonical file for wrappers, in body for standalone)
     gotchas_pattern = re.compile(r"^##\s+(Gotchas|Common Issues)", re.MULTILINE)
-    if not gotchas_pattern.search(body):
+    check_text = canonical_text if is_wrapper else body
+    if not gotchas_pattern.search(check_text):
         issues.append(("ERROR", "Missing ## Gotchas or ## Common Issues section"))
 
     # Check no README.md
@@ -138,6 +152,14 @@ def main():
             if level == "ERROR":
                 errors += 1
             else:
+                warnings += 1
+
+    # Check that each .claude/skills/ wrapper has a corresponding agents/skills/ canonical
+    if CANONICAL_SKILLS_DIR.exists():
+        for skill_dir in skill_dirs:
+            canonical = CANONICAL_SKILLS_DIR / skill_dir.name / "SKILL.md"
+            if not canonical.exists():
+                print(f" WARN {skill_dir.name}: no canonical definition at agents/skills/{skill_dir.name}/SKILL.md")
                 warnings += 1
 
     print(f"\n{len(skill_dirs)} skills checked: {errors} errors, {warnings} warnings")

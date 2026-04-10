@@ -23,8 +23,13 @@ def validate():
         print("No agents/ directory found")
         return True
 
+    roles_dir = agents_dir / "roles"
+    if not roles_dir.exists():
+        print("No agents/roles/ directory found")
+        return True
+
     failures = []
-    for f in sorted(agents_dir.glob("*.md")):
+    for f in sorted(roles_dir.glob("*.md")):
         if f.name in EXCLUDED:
             continue
         content = f.read_text()
