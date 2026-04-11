@@ -28,3 +28,4 @@ logs/
 1. `session-start.sh` creates per-user directories and writes `.current_session`
 2. `post-tool-use-audit.sh` appends to `agent_audit.log`
 3. `session-end.sh` writes or updates the daily progress report
+4. `push-logs.sh` syncs logs/notes to main and regenerates `notes/handoffs/INDEX.md`

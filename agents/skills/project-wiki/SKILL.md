@@ -69,24 +69,101 @@ Compile per-user streams into shared knowledge artifacts.
 
 Invoke with: "compile the wiki" / "update knowledge base"
 
-#### Compilation Sources
+#### Step 1: Generate Source Manifest
 
-Read from ALL user streams:
-- `logs/progress/*/` — per-user session progress reports
-- `notes/*/` — per-user notes, plans, research
-- `notes/*/handoffs/` — per-user handoff documents
+Run the manifest scanner to identify what needs compilation:
 
-#### Compilation Outputs
+```
+python3 agents/skills/project-wiki/scripts/compile_sources.py
+```
 
-1. **Wiki pages** written to `knowledge/wiki/`
-2. **Taxonomy updates** appended to `knowledge/taxonomy.yaml` for new categories discovered during compilation
-3. **Handoff index** regenerated at `notes/handoffs/INDEX.md` by scanning all `notes/*/handoffs/*.md`
+For a full recompilation (ignore last compile timestamp):
+```
+python3 agents/skills/project-wiki/scripts/compile_sources.py --full
+```
 
-#### Compilation State
+Review the output JSON. The `sources` array lists every file to consider.
+The `by_type` and `by_user` summaries help decide compilation scope.
+If `total_new` is 0, no compilation is needed — inform the user and stop.
 
-Track last compilation via `knowledge/research/.last_compile` timestamp file.
-The session-start hook checks this timestamp against source modification dates
-and warns when recompilation is needed.
+#### Step 2: Read and Analyze Sources
+
+Read the source files listed in the manifest. Prioritize:
+1. Handoff documents (active first, then completed) — richest structured content
+2. Progress logs — session-level observations and decisions
+3. Plans and research notes — supporting context
+
+For each source, identify:
+- Key decisions made and their rationale
+- Patterns discovered or conventions established
+- Architecture or process changes
+- Lessons learned or gotchas
+- Open questions or risks
+
+#### Step 3: Synthesize Wiki Pages
+
+For each topic cluster identified in Step 2:
+
+1. Check if a wiki page already exists in `knowledge/wiki/` for that topic
+2. If yes: read the existing page, merge new findings, update the "Last compiled" date
+3. If no: create a new page following this structure:
+
+```markdown
+# <Topic Title>
+
+**Category**: <from knowledge/taxonomy.yaml>
+**Confidence**: <verified|inferred|external>
+**Last compiled**: <YYYY-MM-DD>
+**Sources**: <N> documents from <M> users
+
+## Summary
+
+<2-4 paragraph synthesized overview>
+
+## Key Points
+
+- <Actionable finding or decision>
+- <Pattern or convention discovered>
+
+## Source References
+
+- [source title](../../notes/<user>/handoffs/...) — <what this source contributed>
+- [progress log](../../logs/progress/<user>/2026-04-10.md) — <what was observed>
+```
+
+Filename convention: `knowledge/wiki/<kebab-case-topic>.md`
+
+#### Step 4: Update Taxonomy
+
+Review `knowledge/taxonomy.yaml`. If compilation revealed categories that
+don't fit existing ones, append them under `categories:` with a description.
+
+#### Step 5: Regenerate Handoff Index
+
+```bash
+bash scripts/utils/generate-handoff-index.sh
+```
+
+#### Step 6: Update Compile Timestamp
+
+After successful compilation:
+```
+python3 agents/skills/project-wiki/scripts/compile_sources.py --touch
+```
+
+Or manually:
+```bash
+date -u +%Y-%m-%dT%H:%M:%SZ > knowledge/research/.last_compile
+```
+
+#### Compilation Principles
+
+- **Synthesize, don't copy.** Wiki pages distill knowledge; they are not duplicates.
+- **Cross-user.** Merge findings from all users into shared topic pages.
+- **Incremental by default.** Only process sources newer than `.last_compile`.
+- **Preserve existing.** Update wiki pages in place; never delete content without cause.
+- **Cite sources.** Every claim should trace to a source via the References section.
+- **Confidence levels.** Use `verified` for tested findings, `inferred` for analysis, `external` for third-party.
 
 ## Gotchas
 

@@ -50,6 +50,11 @@ for dir in logs notes; do
     fi
 done
 
+# Regenerate handoff index in worktree
+if [[ -x "$ROOT_DIR/scripts/utils/generate-handoff-index.sh" ]]; then
+    bash "$ROOT_DIR/scripts/utils/generate-handoff-index.sh" "$WORKTREE_DIR" 2>/dev/null || true
+fi
+
 # Check if anything changed
 cd "$WORKTREE_DIR"
 if [[ -n "$(git status --porcelain -- logs/ notes/ 2>/dev/null)" ]]; then
