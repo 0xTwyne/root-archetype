@@ -97,6 +97,7 @@ Canonical definitions live in `agents/skills/`, with a catalog at
 | `new-skill` | "create a skill", "scaffold skill" |
 | `new-handoff` | "new handoff", "track work item" |
 | `init-wizard` | Automatic when `.needs-init` exists |
+| `wrap-up` | "wrap up", mid-session save, checkpoint progress |
 
 ## Knowledge Management
 
