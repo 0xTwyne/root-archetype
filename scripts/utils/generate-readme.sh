@@ -127,12 +127,14 @@ ${REPO_TABLE:-| *(none yet)* | — | — |}
 │   ├── session/           # Session lifecycle
 │   ├── repos/             # Child repo management
 │   └── utils/             # Logging, analysis, generation
-├── knowledge/             # Master wiki + research intake (maintainer-curated)
+├── knowledge/
+│   ├── wiki/              # Master wiki (maintainer-curated)
+│   └── research/          # Master research intake (promoted from member intake)
 ├── logs/                  # Stub — actual data in log repo
 ├── notes/                 # Stub — actual data in log repo
 ├── repos/
-│   ├── ${LOG_REPO_NAME}/  # Log repo (session logs, notes, handoffs)
-│   └── <child-repos>/     # Registered application repos
+│   ├── ${LOG_REPO_NAME}/  # Log repo (logs, notes, handoffs, per-member wikis + research)
+│   └── <child-repo>/      # Registered application repos (symlink or physical)
 ├── secrets/               # Protected paths (contents gitignored)
 └── local/                 # Per-machine customization (gitignored)
 \`\`\`
@@ -154,6 +156,7 @@ even when the root repo has required reviews or CI gates.
 | \`logs/progress/<user>/\` | Daily session progress reports |
 | \`logs/agent_audit.log\` | Append-only audit trail (JSONL) |
 | \`notes/<user>/handoffs/\` | Work tracking documents (active/completed) |
+| \`notes/<user>/research/\` | Per-member research intake (promoted to master by maintainers) |
 | \`notes/<user>/facts.md\` | Cross-session facts cache |
 | \`wiki/<user>/\` | Per-member wiki compilations |
 
@@ -192,14 +195,15 @@ ${SKILL_COUNT} skills available. Canonical definitions in \`agents/skills/\`.
 
 ## Knowledge Management
 
-Per-user streams in the log repo feed into a shared master wiki in the root repo
-through a two-tier compilation pipeline.
+All team members produce into the log repo — notes, progress, research intake.
+Maintainers curate and promote into the root repo's master wiki and research database.
 
 \`\`\`
- Log Repo                              Root Repo
+ Log Repo (any team member)             Root Repo (maintainer-curated)
 ┌─────────────────────────────┐       ┌──────────────────────┐
 │ notes/<user>/handoffs/      │       │                      │
 │ notes/<user>/plans/         │──┐    │                      │
+│ notes/<user>/research/      │  │    │                      │
 │ logs/progress/<user>/       │  │    │                      │
 └─────────────────────────────┘  │    │                      │
                                  v    │                      │
@@ -213,27 +217,21 @@ through a two-tier compilation pipeline.
 │ (per-member wiki)           │  │    │                      │
 └─────────────────────────────┘  │    │                      │
                                  v    │                      │
-              ┌──────────────────────┐│                      │
-              │ /project-wiki compile││  knowledge/wiki/     │
-              │ --master             │├─>(master wiki)       │
-              │ (maintainer only,    ││  compiled, cross-    │
-              │  auto when member    ││  user, cited,        │
-              │  compiles own wiki)  ││  queryable           │
-              └──────────────────────┘│                      │
-                                      │  knowledge/research/ │
-              ┌──────────────────────┐│  (external intake)   │
-              │ /research-intake     │├─>deep-dives/         │
-              │ URLs, papers,        ││                      │
-              │ benchmarks           ││                      │
+              ┌──────────────────────┐│  knowledge/wiki/     │
+              │ /project-wiki compile│├─>(master wiki)       │
+              │ --master             ││                      │
+              │ (maintainer only,    ││  knowledge/research/ │
+              │  auto when member    │├─>(master research)   │
+              │  compiles own wiki)  ││                      │
               └──────────────────────┘└──────────────────────┘
 \`\`\`
 
 ${WIKI_STATUS}
 
 - **Write to**: \`<log-repo>/notes/<username>/\`, \`<log-repo>/logs/progress/<username>/\`
+- **Research intake**: \`/research-intake\` → \`<log-repo>/notes/<username>/research/\`
 - **Per-member wiki**: \`/project-wiki compile --user <name>\` → \`<log-repo>/wiki/<name>/\`
-- **Master wiki**: \`/project-wiki compile --master\` → \`knowledge/wiki/\` (maintainer, auto-triggered)
-- **Ingest external**: \`/research-intake\` → \`knowledge/research/\`
+- **Master wiki + research**: \`/project-wiki compile --master\` → \`knowledge/wiki/\` + \`knowledge/research/\` (maintainer, auto-triggered)
 
 ## Child Repo Management
 
