@@ -27,10 +27,17 @@ Umbrella repository for cross-repo coordination and governance. No application c
 
 ## Knowledge
 
-- `knowledge/wiki/` — compiled shared knowledge
+- `knowledge/wiki/` — compiled master wiki (maintained by project maintainers)
 - `knowledge/research/` — structured research and deep dives
-- `notes/<user>/` — per-user notes, plans, handoffs
-- `logs/progress/<user>/` — per-user session progress logs
+
+### Log Repo (registered in `repos/`)
+
+Session logs, notes, handoffs, and per-member wiki compilations live in a
+separate log repo. Resolve from `.archetype-manifest.json` → `log_repo_name`.
+
+- `<log-repo>/logs/progress/<user>/` — per-user session progress logs
+- `<log-repo>/notes/<user>/` — per-user notes, plans, handoffs
+- `<log-repo>/wiki/<user>/` — per-member wiki compilations
 
 ## Child Repos
 

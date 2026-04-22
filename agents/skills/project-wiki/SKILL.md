@@ -69,6 +69,28 @@ Compile per-user streams into shared knowledge artifacts.
 
 Invoke with: "compile the wiki" / "update knowledge base"
 
+#### Compilation Modes
+
+**Per-member compilation** (any team member):
+```
+python3 agents/skills/project-wiki/scripts/compile_sources.py --user <username>
+```
+- Reads: `<log-repo>/logs/progress/<user>/`, `<log-repo>/notes/<user>/`
+- Writes: `<log-repo>/wiki/<user>/`
+
+**Master compilation** (maintainer only):
+```
+python3 agents/skills/project-wiki/scripts/compile_sources.py --master
+```
+- Reads: all `<log-repo>/wiki/<user>/` + `<log-repo>/notes/` + `<log-repo>/logs/`
+- Writes: `<root-repo>/knowledge/wiki/`
+
+When a maintainer compiles their personal wiki, master wiki recompilation
+happens automatically unless `--skip-master` is passed.
+
+Resolve the log repo from `.archetype-manifest.json` (`log_repo_name`) via
+the `repos/` directory. Override with `--log-repo <path>` if needed.
+
 #### Step 1: Generate Source Manifest
 
 Run the manifest scanner to identify what needs compilation:

@@ -14,6 +14,7 @@ set -euo pipefail
 # 5. Create PR if substantive changes
 
 hook_load_identity
+hook_resolve_log_repo 2>/dev/null || true
 
 # Log session end
 if [[ -f "$PROJECT_DIR/scripts/utils/agent_log.sh" ]]; then
@@ -22,11 +23,16 @@ if [[ -f "$PROJECT_DIR/scripts/utils/agent_log.sh" ]]; then
 fi
 
 
-# --- Write per-user progress report ---
+# --- Write per-user progress report (to log repo) ---
 if [[ -n "$SESSION_USER" && "$SESSION_USER" != "unknown" ]]; then
-  PROGRESS_DIR="$PROJECT_DIR/logs/progress/$SESSION_USER"
+  _LOG_BASE="${LOG_REPO_DIR:-$PROJECT_DIR}"
+  PROGRESS_DIR="$_LOG_BASE/logs/progress/$SESSION_USER"
   mkdir -p "$PROGRESS_DIR"
   PROGRESS_FILE="$PROGRESS_DIR/$(date -u +%Y-%m-%d).md"
+
+  # Resolve repo name for provenance
+  _REPO_NAME="$(jq -r '.root_repo // empty' "$PROJECT_DIR/.session-identity" 2>/dev/null || basename "$PROJECT_DIR")"
+
   if [[ ! -f "$PROGRESS_FILE" ]]; then
     echo "# Progress: $(date -u +%Y-%m-%d)" > "$PROGRESS_FILE"
     echo "" >> "$PROGRESS_FILE"
@@ -37,6 +43,7 @@ if [[ -n "$SESSION_USER" && "$SESSION_USER" != "unknown" ]]; then
     echo "## Session: ${SESSION_ID:-unknown}" >> "$PROGRESS_FILE"
     echo "" >> "$PROGRESS_FILE"
   fi
+  echo "- Repo: ${_REPO_NAME}" >> "$PROGRESS_FILE"
   echo "- Branch: $(git -C "$PROJECT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)" >> "$PROGRESS_FILE"
   echo "- Ended: $(date -u +%H:%M:%S)" >> "$PROGRESS_FILE"
 fi

@@ -24,13 +24,37 @@ else
 fi
 
 # --- Required directories ---
-for dir in logs handoffs/active agents scripts; do
+for dir in agents scripts knowledge; do
     if [[ -d "${REPO_ROOT}/${dir}" ]]; then
         check_pass "Directory exists: ${dir}"
     else
         check_fail "Missing directory: ${dir}"
     fi
 done
+
+# --- Log repo ---
+if [[ -f "${REPO_ROOT}/scripts/hooks/lib/hook-utils.sh" ]]; then
+    PROJECT_DIR="$REPO_ROOT"
+    source "${REPO_ROOT}/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
+    hook_resolve_log_repo 2>/dev/null || true
+fi
+
+if [[ -n "${LOG_REPO_DIR:-}" && "$LOG_REPO_DIR" != "$REPO_ROOT" ]]; then
+    if [[ -d "$LOG_REPO_DIR/.git" ]]; then
+        check_pass "Log repo reachable: $(basename "$LOG_REPO_DIR")"
+        for dir in logs notes; do
+            if [[ -d "$LOG_REPO_DIR/$dir" ]]; then
+                check_pass "Log repo directory: ${dir}"
+            else
+                check_warn "Log repo missing: ${dir}"
+            fi
+        done
+    else
+        check_fail "Log repo not a git repo: $LOG_REPO_DIR"
+    fi
+else
+    check_warn "No separate log repo configured (using root repo for logs)"
+fi
 
 # --- Hooks configured ---
 SETTINGS="${REPO_ROOT}/.claude/settings.json"
