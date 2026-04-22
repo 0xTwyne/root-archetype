@@ -5,6 +5,10 @@
 
 ## pestopoppa
 
+### Active
+
+- [Hook Path Resolution — CWD-Dependent Failures](../pestopoppa/handoffs/active/hook-path-resolution.md) — 2026-04-22
+
 ### Completed
 
 - [Handoff 1: Structure Cleanup](../pestopoppa/handoffs/completed/01-structure-cleanup.md) — 2026-04-09
