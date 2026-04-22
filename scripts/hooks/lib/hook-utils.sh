@@ -100,10 +100,12 @@ hook_load_identity() {
 
 # --- Inject facts cache into session context ---
 # Emits additionalContext with notes/<user>/facts.md if present.
+# Reads from log repo if available, falls back to project dir.
 hook_inject_facts() {
   hook_load_identity
-  local project_dir="${CLAUDE_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)}"
-  local facts_file="$project_dir/notes/$SESSION_USER/facts.md"
+  hook_resolve_log_repo 2>/dev/null || true
+  local base_dir="${LOG_REPO_DIR:-${CLAUDE_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)}}"
+  local facts_file="$base_dir/notes/$SESSION_USER/facts.md"
   if [[ -f "$facts_file" && -s "$facts_file" ]]; then
     local facts
     facts="$(cat "$facts_file" 2>/dev/null || true)"
@@ -114,3 +116,9 @@ hook_inject_facts() {
   fi
   return 1
 }
+
+# --- Source log repo resolution utility ---
+_HOOK_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$_HOOK_LIB_DIR/log-repo.sh" ]]; then
+  source "$_HOOK_LIB_DIR/log-repo.sh"
+fi

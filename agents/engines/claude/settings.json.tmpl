@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/hooks/session-start.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/session-start.sh\"",
             "timeout": 15000
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/hooks/session-end.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/session-end.sh\"",
             "timeout": 15000
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/hooks/check_secrets_read.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/check_secrets_read.sh\"",
             "timeout": 5000
           }
         ]
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/hooks/check_filesystem_path.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/check_filesystem_path.sh\"",
             "timeout": 5000
           }
         ]
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/hooks/post-tool-use-audit.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/post-tool-use-audit.sh\"",
             "timeout": 5000
           }
         ]

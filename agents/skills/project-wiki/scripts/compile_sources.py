@@ -37,6 +37,28 @@ def _find_project_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
 
+def _resolve_log_repo(root: Path) -> Path:
+    """Resolve the log repo path from the manifest. Falls back to root."""
+    manifest = root / ".archetype-manifest.json"
+    if manifest.exists():
+        try:
+            import json as _json
+            data = _json.loads(manifest.read_text())
+            log_name = data.get("log_repo_name", "")
+            if log_name:
+                repo_dir = root / "repos" / log_name
+                if repo_dir.is_dir():
+                    return repo_dir.resolve()
+                # Check if it's a symlink
+                if repo_dir.is_symlink():
+                    resolved = repo_dir.resolve()
+                    if resolved.is_dir():
+                        return resolved
+        except (ValueError, OSError, KeyError):
+            pass
+    return root
+
+
 ROOT = _find_project_root()
 
 LAST_COMPILE_PATH = ROOT / "knowledge" / "research" / ".last_compile"
@@ -109,8 +131,15 @@ def extract_user(path: Path, base: str) -> str:
     return "unknown"
 
 
-def scan_sources(since: float, type_filter: str | None) -> list[dict]:
-    """Walk source directories and collect files newer than `since`."""
+def scan_sources(since: float, type_filter: str | None, log_root: Path | None = None,
+                  user_filter: str | None = None) -> list[dict]:
+    """Walk source directories and collect files newer than `since`.
+
+    Args:
+        log_root: Base directory for log/note sources. Defaults to ROOT.
+        user_filter: If set, only scan this user's directories.
+    """
+    scan_root = log_root if log_root is not None else ROOT
     seen: set[Path] = set()
     results: list[dict] = []
 
@@ -118,7 +147,7 @@ def scan_sources(since: float, type_filter: str | None) -> list[dict]:
         if type_filter and source_type != type_filter:
             continue
 
-        base_path = ROOT / base_dir
+        base_path = scan_root / base_dir
         if not base_path.exists():
             continue
 
@@ -127,6 +156,8 @@ def scan_sources(since: float, type_filter: str | None) -> list[dict]:
             if not user_dir.is_dir():
                 continue
             user = user_dir.name
+            if user_filter and user != user_filter:
+                continue
 
             if subdir:
                 scan_dir = user_dir / subdir
@@ -156,7 +187,7 @@ def scan_sources(since: float, type_filter: str | None) -> list[dict]:
                     continue
 
                 results.append({
-                    "path": str(md_file.relative_to(ROOT)),
+                    "path": str(md_file.relative_to(scan_root)),
                     "user": user,
                     "type": source_type,
                     "modified": datetime.fromtimestamp(
@@ -212,6 +243,27 @@ def main() -> int:
         "--since",
         help="Override since-date (YYYY-MM-DD). Takes precedence over .last_compile.",
     )
+    parser.add_argument(
+        "--log-repo",
+        dest="log_repo",
+        help="Explicit log repo path (overrides manifest auto-detection).",
+    )
+    parser.add_argument(
+        "--user",
+        dest="user_filter",
+        help="Compile only this user's sources.",
+    )
+    parser.add_argument(
+        "--master",
+        action="store_true",
+        help="Run master wiki compilation (all users → root-repo/knowledge/wiki/).",
+    )
+    parser.add_argument(
+        "--skip-master",
+        dest="skip_master",
+        action="store_true",
+        help="Skip automatic master recompilation for maintainers.",
+    )
 
     args = parser.parse_args()
 
@@ -234,8 +286,22 @@ def main() -> int:
         since = get_last_compile()
         mode = "incremental"
 
-    sources = scan_sources(since, args.type_filter)
+    # Resolve log repo
+    log_root: Path | None = None
+    if args.log_repo:
+        log_root = Path(args.log_repo).resolve()
+    else:
+        resolved = _resolve_log_repo(ROOT)
+        if resolved != ROOT:
+            log_root = resolved
+
+    sources = scan_sources(since, args.type_filter, log_root=log_root,
+                           user_filter=args.user_filter)
     manifest = build_manifest(sources, mode)
+
+    # Add log repo info to manifest
+    if log_root is not None:
+        manifest["log_repo"] = str(log_root)
 
     json.dump(manifest, sys.stdout, indent=2)
     print()

@@ -10,6 +10,7 @@ PATTERNS_FILE="$PROJECT_DIR/scripts/hooks/lib/secret-patterns.txt"
 MAINTAINERS_FILE="$PROJECT_DIR/MAINTAINERS.json"
 
 source "$PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
+hook_resolve_log_repo 2>/dev/null || true
 trap 'hook_fail_open "pre-edit-guard" "unexpected error"' ERR
 
 INPUT="$(cat)"
@@ -38,14 +39,25 @@ if [[ -n "$CONTENT" && -f "$PATTERNS_FILE" ]]; then
   done < "$PATTERNS_FILE"
 fi
 
-# --- Log isolation ---
-REL_PATH="${FILE_PATH#$PROJECT_DIR/}"
+# --- Log isolation (applies to paths in both root repo and log repo) ---
+REL_PATH=""
 IS_LOG_PATH=false
-case "$REL_PATH" in
-  logs/audit/*|logs/progress/*|notes/*)
-    IS_LOG_PATH=true
-    ;;
-esac
+
+# Check if path is in the log repo
+_LOG_DIR="${LOG_REPO_DIR:-$PROJECT_DIR}"
+if [[ "$_LOG_DIR" != "$PROJECT_DIR" && "$FILE_PATH" == "$_LOG_DIR"/* ]]; then
+  REL_PATH="${FILE_PATH#$_LOG_DIR/}"
+elif [[ "$FILE_PATH" == "$PROJECT_DIR"/* ]]; then
+  REL_PATH="${FILE_PATH#$PROJECT_DIR/}"
+fi
+
+if [[ -n "$REL_PATH" ]]; then
+  case "$REL_PATH" in
+    logs/audit/*|logs/progress/*|notes/*)
+      IS_LOG_PATH=true
+      ;;
+  esac
+fi
 
 if [[ "$IS_LOG_PATH" == "true" ]]; then
   # Exempt shared files
@@ -55,6 +67,11 @@ if [[ "$IS_LOG_PATH" == "true" ]]; then
       ;;
   esac
   [[ "$(basename "$REL_PATH")" == ".gitkeep" ]] && IS_LOG_PATH=false
+
+  # In split mode, warn if writing to root repo's skeletal stubs
+  if [[ "$IS_LOG_PATH" == "true" && "$_LOG_DIR" != "$PROJECT_DIR" && "$FILE_PATH" == "$PROJECT_DIR"/* ]]; then
+    add_context "WARNING: logs/ and notes/ in the root repo are stubs. Actual data should be written to the log repo at ${_LOG_DIR}."
+  fi
 fi
 
 if [[ "$IS_LOG_PATH" == "true" ]]; then

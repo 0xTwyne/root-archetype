@@ -5,7 +5,14 @@ set -euo pipefail
 # Triggered on PreToolUse for Skill tool
 # Logs invocations for undertriggering/overtriggering analysis
 
-LOG_DIR="${CLAUDE_PLUGIN_DATA:-logs/skills}"
+# Resolve log repo for log directory
+_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+if [[ -f "$_PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" ]]; then
+    PROJECT_DIR="$_PROJECT_DIR"
+    source "$_PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
+    hook_resolve_log_repo 2>/dev/null || true
+fi
+LOG_DIR="${CLAUDE_PLUGIN_DATA:-${LOG_REPO_DIR:-$_PROJECT_DIR}/logs/skills}"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/invocations.log"
 

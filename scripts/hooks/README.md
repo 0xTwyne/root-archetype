@@ -31,10 +31,43 @@ points to paths here.
 `scripts/hooks/lib/` contains shared utilities:
 
 - `hook-utils.sh` — Common functions (hook_silent, hook_block, hook_warn, hook_load_identity, etc.)
+- `log-repo.sh` — Log repo resolution (hook_resolve_log_repo, hook_is_split_mode, hook_ensure_log_dirs)
 - `session-counters.sh` — Per-session dedup counters
 - `secret-patterns.txt` — Shared secret detection patterns (tab-separated: label, regex, replacement)
+
+### Log Repo Resolution
+
+All hooks automatically gain access to `$LOG_REPO_DIR` by sourcing `hook-utils.sh`,
+which sources `log-repo.sh`. The resolution flow:
+
+1. Check `$ARCHETYPE_LOG_REPO` env var (explicit override)
+2. Read `.archetype-manifest.json` → `log_repo_name` → `repos/<name>` directory
+3. Fallback to `$PROJECT_DIR` (pre-init or broken path)
+
+Use `hook_is_split_mode` to check if the log repo is separate from the root repo.
+Use `hook_ensure_log_dirs "$SESSION_USER"` to create per-user directories in the log repo.
 
 ## Enabling Optional Hooks
 
 Add entries to `.claude/settings.json` following the patterns in the default hooks.
 The init wizard (`--guided` mode) provides an interactive hook selection menu.
+
+**Important:** All hook commands must use the `${CLAUDE_PROJECT_DIR:-.}/` prefix
+so paths resolve correctly regardless of working directory:
+
+```json
+{
+  "matcher": "Write|Edit",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/pre-edit-guard.sh\"",
+      "timeout": 5000
+    }
+  ]
+}
+```
+
+Do **not** use bare relative paths like `bash scripts/hooks/pre-edit-guard.sh` —
+these fail when Claude Code's working directory is not the project root
+(e.g., during worktree operations or subagent execution).

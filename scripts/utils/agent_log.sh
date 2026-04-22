@@ -2,7 +2,8 @@
 # Agent audit logging — append-only JSONL with session tracking
 # Usage: source scripts/utils/agent_log.sh
 
-_AGENT_LOG_DIR="${AGENT_LOG_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || echo ".")/logs}"
+# Resolve log directory: prefer log repo if available, fall back to root repo
+_AGENT_LOG_DIR="${AGENT_LOG_DIR:-${LOG_REPO_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || echo ".")}/logs}"
 _AGENT_LOG_FILE="${_AGENT_LOG_DIR}/agent_audit.log"
 _AGENT_SESSION_FILE="${_AGENT_LOG_DIR}/.current_session"
 _AGENT_SESSION_STALE_HOURS=4
@@ -30,6 +31,19 @@ _agent_log() {
     session=$(_agent_session_id)
     local ts
     ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    # Resolve repo/branch provenance (cached per session)
+    if [[ -z "${_AGENT_LOG_REPO:-}" ]]; then
+        local _root
+        _root="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
+        if [[ -f "$_root/.session-identity" ]]; then
+            _AGENT_LOG_REPO="$(jq -r '.root_repo // empty' "$_root/.session-identity" 2>/dev/null || echo "")"
+            _AGENT_LOG_BRANCH="$(jq -r '.branch // empty' "$_root/.session-identity" 2>/dev/null || echo "")"
+        fi
+        _AGENT_LOG_REPO="${_AGENT_LOG_REPO:-$(basename "$_root")}"
+        _AGENT_LOG_BRANCH="${_AGENT_LOG_BRANCH:-$(git -C "$_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")}"
+    fi
+
     local json
     json=$(jq -nc \
         --arg ts "$ts" \
@@ -38,7 +52,9 @@ _agent_log() {
         --arg cat "$category" \
         --arg msg "$message" \
         --arg details "$details" \
-        '{ts:$ts, session:$session, level:$level, cat:$cat, msg:$msg, details:$details}')
+        --arg repo "${_AGENT_LOG_REPO:-}" \
+        --arg branch "${_AGENT_LOG_BRANCH:-}" \
+        '{ts:$ts, session:$session, level:$level, cat:$cat, msg:$msg, details:$details, repo:$repo, branch:$branch}')
     echo "$json" >> "$_AGENT_LOG_FILE"
 }
 

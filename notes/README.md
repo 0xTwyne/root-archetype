@@ -1,21 +1,27 @@
-# Notes — Per-User Convention
+# Notes
 
-Each team member has a personal directory: `notes/<username>/`
+This directory is a **stub** in the root governance repo. Per-user notes,
+handoffs, plans, and facts live in the **log repo**.
 
-## Structure
+## Where is the log repo?
+
+```bash
+jq -r '.log_repo_name' .archetype-manifest.json
+# Then look in repos/<name>/notes/
+```
+
+## Log repo notes structure
 
 ```
-notes/
-├── README.md                  # This file
-├── handoffs/
-│   ├── INDEX.md               # Auto-generated handoff aggregation
-│   └── .gitkeep
-└── <username>/
-    ├── plans/                 # Active plans and design documents
-    ├── research/              # Research observations and notes
-    └── handoffs/              # Work handoff documents
-        ├── active/            # In-progress handoffs
-        └── completed/         # Finished handoffs
+<log-repo>/notes/
+├── <username>/
+│   ├── plans/             # Session plans and design documents
+│   ├── handoffs/          # Work handoff documents
+│   │   ├── active/        # In-progress handoffs
+│   │   └── completed/     # Finished handoffs
+│   └── facts.md           # Cross-session facts cache
+└── handoffs/
+    └── INDEX.md           # Auto-generated aggregate index
 ```
 
 ## Rules
@@ -23,11 +29,4 @@ notes/
 1. Only write to YOUR directory (`notes/<your-username>/`)
 2. Never edit another user's files
 3. Handoff INDEX.md is auto-generated — don't edit manually
-
-## Lifecycle
-
-1. `session-start.sh` creates your personal directory on first session
-2. Use `/new-handoff` to create structured handoff documents
-3. `notes/handoffs/INDEX.md` is regenerated automatically on every
-   session-end by `scripts/utils/generate-handoff-index.sh` (called
-   from `push-logs.sh`). Can also be run manually or via `/project-wiki compile`.
+4. Use `/new-handoff` to create structured handoff documents

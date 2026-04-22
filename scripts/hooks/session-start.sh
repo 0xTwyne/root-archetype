@@ -9,9 +9,12 @@ set -euo pipefail
 # Hook: SessionStart
 # 1. Resolves username and persists to .session-identity
 # 2. Pulls latest main, creates session branch
-# 3. Creates per-user log/notes directories
+# 3. Creates per-user log/notes directories (in log repo)
 # 4. Loads agent registry + facts cache
 # 5. Initializes session stats tracker
+
+# Resolve log repo early (needed for dir creation and facts loading)
+hook_resolve_log_repo 2>/dev/null || true
 
 INPUT="$(cat)"
 SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")"
@@ -51,18 +54,23 @@ fi
 SESSION_USER="$(echo "$SESSION_USER" | tr -cd 'a-zA-Z0-9_-')"
 [[ -z "$SESSION_USER" ]] && SESSION_USER="unknown"
 
+# Resolve project name from manifest or directory basename
+ROOT_REPO_NAME="$(jq -r '.template_values.PROJECT_NAME // empty' "$PROJECT_DIR/.archetype-manifest.json" 2>/dev/null || echo "")"
+[[ -z "$ROOT_REPO_NAME" ]] && ROOT_REPO_NAME="$(basename "$PROJECT_DIR")"
+
 # Write .session-identity (gitignored) — read by all hooks
 jq -cn \
   --arg session_id "$SESSION_ID" \
   --arg user "$SESSION_USER" \
   --arg branch "$BRANCH_NAME" \
-  '{session_id: $session_id, user: $user, branch: $branch}' \
+  --arg root_repo "$ROOT_REPO_NAME" \
+  --arg root_repo_path "$PROJECT_DIR" \
+  --arg log_repo_path "${LOG_REPO_DIR:-$PROJECT_DIR}" \
+  '{session_id: $session_id, user: $user, branch: $branch, root_repo: $root_repo, root_repo_path: $root_repo_path, log_repo_path: $log_repo_path}' \
   > "$PROJECT_DIR/.session-identity"
 
-# --- Create per-user directories ---
-mkdir -p "$PROJECT_DIR/logs/audit/$SESSION_USER"
-mkdir -p "$PROJECT_DIR/logs/progress/$SESSION_USER"
-mkdir -p "$PROJECT_DIR/notes/$SESSION_USER/plans"
+# --- Create per-user directories (in log repo) ---
+hook_ensure_log_dirs "$SESSION_USER"
 
 # Initialize session stats tracker (gitignored)
 echo '{"tool_calls":0,"subagents":0,"file_modifications":0}' > "$PROJECT_DIR/.session-stats"
@@ -101,8 +109,8 @@ if [[ -f "$PROJECT_DIR/agents/registry.json" ]]; then
   CONTEXT+="Agent registry: $AGENT_COUNT agents available.\n"
 fi
 
-# --- Inject cross-session facts cache ---
-FACTS_FILE="$PROJECT_DIR/notes/$SESSION_USER/facts.md"
+# --- Inject cross-session facts cache (from log repo) ---
+FACTS_FILE="${LOG_REPO_DIR:-$PROJECT_DIR}/notes/$SESSION_USER/facts.md"
 if [[ -f "$FACTS_FILE" ]] && [[ -s "$FACTS_FILE" ]]; then
   FACTS_LINES="$(wc -l < "$FACTS_FILE")"
   CONTEXT+="\nCROSS-SESSION FACTS ($FACTS_LINES lines loaded from notes/$SESSION_USER/facts.md):\n"
@@ -117,9 +125,10 @@ if [[ -f "$PROJECT_DIR/.needs-init" ]]; then
   CONTEXT+="Run the init-wizard skill to complete guided setup.\n"
 fi
 
-# --- Stale wiki detection ---
+# --- Stale wiki detection (scan log repo sources) ---
 if [[ -f "$PROJECT_DIR/knowledge/research/.last_compile" ]]; then
-  NEWEST_SOURCE="$(find "$PROJECT_DIR/logs/progress" "$PROJECT_DIR/notes" -name '*.md' -newer "$PROJECT_DIR/knowledge/research/.last_compile" 2>/dev/null | head -1)"
+  _LOG_DIR="${LOG_REPO_DIR:-$PROJECT_DIR}"
+  NEWEST_SOURCE="$(find "$_LOG_DIR/logs/progress" "$_LOG_DIR/notes" -name '*.md' -newer "$PROJECT_DIR/knowledge/research/.last_compile" 2>/dev/null | head -1)"
   if [[ -n "$NEWEST_SOURCE" ]]; then
     CONTEXT+="Knowledge base may be stale. Run /project-wiki compile to update.\n"
   fi

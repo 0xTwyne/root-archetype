@@ -1,4 +1,10 @@
 # Research Intake Index
 # Tracks ingested external sources for deduplication and provenance
 
-entries: []
+entries:
+  - title: "Infisical — Open-Source Secrets Management Platform"
+    source: "https://github.com/Infisical/infisical"
+    date: "2026-04-21"
+    categories: [architecture, operations, tooling, research]
+    deep_dive: "deep-dives/infisical-secrets-management-platform.md"
+    actioned: true

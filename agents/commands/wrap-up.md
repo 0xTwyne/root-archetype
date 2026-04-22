@@ -9,7 +9,8 @@ manually and adds wiki compilation.
 
 ### Step 1: Write Progress Report
 
-Append a progress entry to `logs/progress/<user>/YYYY-MM-DD.md`.
+Resolve the log repo path from `.archetype-manifest.json` (`log_repo_name`) via `repos/<name>`.
+Append a progress entry to `<log-repo>/logs/progress/<user>/YYYY-MM-DD.md`.
 Follow the existing format in that file (or create it if missing):
 
 ```markdown
@@ -30,10 +31,10 @@ to `git config user.name`, or ask.
 
 ### Step 2: Update Handoffs (if applicable)
 
-If any `notes/<user>/handoffs/active/*.md` files relate to the work done:
+If any `<log-repo>/notes/<user>/handoffs/active/*.md` files relate to the work done:
 - Check off completed items
 - Add findings or blockers discovered
-- Move fully completed handoffs to `notes/<user>/handoffs/completed/`
+- Move fully completed handoffs to `<log-repo>/notes/<user>/handoffs/completed/`
 
 If no handoff files are relevant, skip this step.
 
@@ -45,7 +46,8 @@ Run the log push script (safe to call mid-session — uses a worktree):
 bash scripts/utils/push-logs.sh
 ```
 
-This pushes `logs/` and `notes/` to main without disrupting your working branch.
+In split mode, this commits and pushes to the log repo directly.
+In single-repo mode, this pushes via worktree to main.
 
 ### Step 4: Wiki Compilation
 
@@ -66,10 +68,24 @@ skill (Operation 3 in `agents/skills/project-wiki/SKILL.md`):
 5. Regenerate handoff index: `bash scripts/utils/generate-handoff-index.sh`
 6. Update compile timestamp: `python3 agents/skills/project-wiki/scripts/compile_sources.py --touch`
 
-### Step 5: Commit Locally
+### Step 5: Commit Changes
 
-Stage and commit the changes from steps 1–4:
+In split mode, commit to both repos:
 
+**Log repo** (progress, handoffs, per-member wiki):
+```bash
+cd <log-repo>
+git add logs/ notes/ wiki/
+git commit -m "wrap-up: progress + wiki $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+**Root repo** (only if master wiki compilation ran):
+```bash
+git add knowledge/
+git commit -m "wrap-up: master wiki compile $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+In single-repo mode, commit everything together:
 ```bash
 git add logs/ notes/ knowledge/
 git commit -m "wrap-up: progress + wiki compile $(date -u +%Y-%m-%dT%H:%M:%SZ)"

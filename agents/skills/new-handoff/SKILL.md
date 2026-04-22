@@ -13,18 +13,22 @@ Create a properly structured handoff document in `notes/<user>/handoffs/`.
 
 2. Generate a kebab-case filename from the title (e.g. "Auth Middleware Rewrite" → `auth-middleware-rewrite.md`).
 
-3. Check for duplicate filenames:
+3. **Resolve the log repo path**: read `.archetype-manifest.json` for `log_repo_name`, then look in `repos/<name>/`. All handoffs live in the log repo.
+
+4. Check for duplicate filenames in the log repo:
    ```bash
-   find notes/ -path "*/handoffs/*.md" 2>/dev/null | grep -i "<filename>"
+   find <log-repo>/notes/ -path "*/handoffs/*.md" 2>/dev/null | grep -i "<filename>"
    ```
 
-4. Create the handoff using the template in `assets/handoff-template.md`. Fill in:
+5. Create the handoff using the template in `assets/handoff-template.md`. Fill in:
    - **Status**: `active`
    - **Created**: today's date
+   - **Source Repo**: from `.session-identity` `root_repo` field
+   - **Source Branch**: current git branch
    - **Context**: from user input
    - Leave Remediation Plan and Acceptance Criteria as skeleton sections for the user to fill.
 
-5. Place in `notes/<user>/handoffs/<filename>.md`.
+6. Place in `<log-repo>/notes/<user>/handoffs/<filename>.md`.
 
 ## Handoff lifecycle
 
