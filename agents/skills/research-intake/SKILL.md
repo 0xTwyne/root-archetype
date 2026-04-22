@@ -19,15 +19,29 @@ Do not use when:
 - Writing or editing application code
 - Working on handoffs or session management
 
+## Where to write
+
+Research intake writes to the **log repo**, not the root repo. Resolve the log
+repo path from `.archetype-manifest.json` (`log_repo_name`) via `repos/<name>`.
+
+- Deep-dives → `<log-repo>/notes/<user>/research/<slug>.md`
+- Per-user index → `<log-repo>/notes/<user>/research/intake_index.yaml`
+
+Maintainers promote research to the master database (`knowledge/research/`) during
+master wiki compilation (`/project-wiki compile --master`).
+
+The root repo's `knowledge/research/intake_index.yaml` and `knowledge/research/deep-dives/`
+are the **curated master** — only updated by maintainer promotion, not by individual intake.
+
 ## Workflow
 
 1. **Fetch** — Retrieve the source content (URL, file, or user-provided text)
-2. **Dedup** — Check `knowledge/research/intake_index.yaml` for existing entries with the same URL or title
+2. **Dedup** — Check `<log-repo>/notes/<user>/research/intake_index.yaml` for existing entries with the same URL or title. Also check the master index at `knowledge/research/intake_index.yaml`.
 3. **Score** — Assess relevance to project using `knowledge/taxonomy.yaml` categories
 4. **Extract** — Summarize key findings, decisions, or data points
 5. **Categorize** — Map to taxonomy categories; propose new categories if none fit
-6. **Store** — Write structured deep-dive to `knowledge/research/deep-dives/<slug>.md`
-7. **Index** — Append entry to `knowledge/research/intake_index.yaml`
+6. **Store** — Write structured deep-dive to `<log-repo>/notes/<user>/research/<slug>.md`
+7. **Index** — Append entry to `<log-repo>/notes/<user>/research/intake_index.yaml`
 
 ## Deep-Dive Format
 
@@ -60,13 +74,14 @@ Do not use when:
   source: "<URL>"
   date: "<YYYY-MM-DD>"
   categories: [<category1>, <category2>]
-  deep_dive: "deep-dives/<slug>.md"
+  deep_dive: "<slug>.md"
   actioned: false
 ```
 
 ## Gotchas
 
-- Always check for duplicates before ingesting — the index is the source of truth
+- Always check for duplicates in both the per-user index AND the master index before ingesting
 - Set `actioned: false` on new entries; the project-wiki lint pass flags un-actioned entries
 - Confidence level `external` means the finding hasn't been validated against project code
 - Deep-dive files are append-only; update the index entry rather than editing deep-dives
+- Never write directly to `knowledge/research/` — that's the maintainer-curated master. Individual intake always goes to `<log-repo>/notes/<user>/research/`

@@ -82,11 +82,17 @@ python3 agents/skills/project-wiki/scripts/compile_sources.py --user <username>
 ```
 python3 agents/skills/project-wiki/scripts/compile_sources.py --master
 ```
-- Reads: all `<log-repo>/wiki/<user>/` + `<log-repo>/notes/` + `<log-repo>/logs/`
-- Writes: `<root-repo>/knowledge/wiki/`
+- Reads: all per-member wikis (`<log-repo>/wiki/<user>/`) + notes + progress + research
+- Writes wiki to: `<root-repo>/knowledge/wiki/`
+- Promotes research to: `<root-repo>/knowledge/research/` (curated from `<log-repo>/notes/<user>/research/`)
 
-When a maintainer compiles their personal wiki, master wiki recompilation
-happens automatically unless `--skip-master` is passed.
+The `--master` flag includes `wiki/<user>/` directories as source type `member-wiki`,
+so per-member compilations feed into the master synthesis.
+
+When a maintainer compiles their personal wiki, also run master compilation
+automatically unless `--skip-master` is passed. Check `MAINTAINERS.json`
+`global_maintainers` against the current user's email to determine if the
+user is a maintainer.
 
 Resolve the log repo from `.archetype-manifest.json` (`log_repo_name`) via
 the `repos/` directory. Override with `--log-repo <path>` if needed.
@@ -166,16 +172,25 @@ don't fit existing ones, append them under `categories:` with a description.
 bash scripts/utils/generate-handoff-index.sh
 ```
 
-#### Step 6: Update Compile Timestamp
+#### Step 6: Update Compile Timestamp and Mark Promoted
 
-After successful compilation:
+After successful compilation, update the timestamp and mark sources as promoted:
 ```
 python3 agents/skills/project-wiki/scripts/compile_sources.py --touch
 ```
 
-Or manually:
-```bash
-date -u +%Y-%m-%dT%H:%M:%SZ > knowledge/research/.last_compile
+For master compilation, also mark sources so they are skipped in future runs:
+```
+python3 agents/skills/project-wiki/scripts/compile_sources.py --master --touch --mark-promoted
+```
+
+This writes promoted source paths to `<log-repo>/.promoted-sources`. Future
+`--master` runs skip these, making master compilation incremental across both
+time (`--since` / `.last_compile`) and promotion status.
+
+To force a full master recompilation including already-promoted sources:
+```
+python3 agents/skills/project-wiki/scripts/compile_sources.py --master --full
 ```
 
 #### Compilation Principles

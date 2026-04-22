@@ -64,7 +64,7 @@ ROOT = _find_project_root()
 LAST_COMPILE_PATH = ROOT / "knowledge" / "research" / ".last_compile"
 
 # Source type definitions: (base_dir, subdirectory pattern, type label)
-# Each entry is scanned relative to ROOT.
+# Each entry is scanned relative to the log repo (or ROOT in single-repo mode).
 SOURCE_DIRS = [
     ("logs/progress", None, "progress"),
     ("notes", "handoffs/completed", "handoff-completed"),
@@ -74,7 +74,46 @@ SOURCE_DIRS = [
     ("notes", "research", "research"),
 ]
 
-SKIP_FILENAMES = {"INDEX.md", "README.md", ".gitkeep"}
+# Additional sources for master compilation: per-member wiki outputs
+MASTER_SOURCE_DIRS = [
+    ("wiki", None, "member-wiki"),
+]
+
+SKIP_FILENAMES = {"INDEX.md", "README.md", ".gitkeep", "intake_index.yaml"}
+
+PROMOTED_FILENAME = ".promoted-sources"
+
+
+def _promoted_path(log_root: Path | None) -> Path:
+    """Return the path to .promoted-sources in the log repo (or ROOT)."""
+    base = log_root if log_root is not None else ROOT
+    return base / PROMOTED_FILENAME
+
+
+def load_promoted(log_root: Path | None) -> set[str]:
+    """Load the set of already-promoted relative source paths."""
+    path = _promoted_path(log_root)
+    if not path.exists():
+        return set()
+    try:
+        lines = path.read_text().splitlines()
+        return {line.strip() for line in lines if line.strip() and not line.startswith("#")}
+    except OSError:
+        return set()
+
+
+def mark_promoted(sources: list[dict], log_root: Path | None) -> int:
+    """Append source paths to .promoted-sources. Returns count of newly marked."""
+    path = _promoted_path(log_root)
+    existing = load_promoted(log_root)
+    new_paths = [s["path"] for s in sources if s["path"] not in existing]
+    if not new_paths:
+        return 0
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as f:
+        for p in new_paths:
+            f.write(p + "\n")
+    return len(new_paths)
 
 
 def get_last_compile() -> float:
@@ -132,18 +171,30 @@ def extract_user(path: Path, base: str) -> str:
 
 
 def scan_sources(since: float, type_filter: str | None, log_root: Path | None = None,
-                  user_filter: str | None = None) -> list[dict]:
+                  user_filter: str | None = None, master: bool = False,
+                  skip_promoted: bool = False) -> list[dict]:
     """Walk source directories and collect files newer than `since`.
 
     Args:
         log_root: Base directory for log/note sources. Defaults to ROOT.
         user_filter: If set, only scan this user's directories.
+        master: If True, also scan per-member wiki outputs for master compilation.
+        skip_promoted: If True, exclude sources already in .promoted-sources.
     """
     scan_root = log_root if log_root is not None else ROOT
     seen: set[Path] = set()
     results: list[dict] = []
 
-    for base_dir, subdir, source_type in SOURCE_DIRS:
+    promoted: set[str] = set()
+    if skip_promoted:
+        promoted = load_promoted(log_root)
+
+    # Include per-member wiki outputs when doing master compilation
+    source_dirs = list(SOURCE_DIRS)
+    if master:
+        source_dirs.extend(MASTER_SOURCE_DIRS)
+
+    for base_dir, subdir, source_type in source_dirs:
         if type_filter and source_type != type_filter:
             continue
 
@@ -186,8 +237,13 @@ def scan_sources(since: float, type_filter: str | None, log_root: Path | None = 
                 if mtime <= since:
                     continue
 
+                rel_path = str(md_file.relative_to(scan_root))
+
+                if promoted and rel_path in promoted:
+                    continue
+
                 results.append({
-                    "path": str(md_file.relative_to(scan_root)),
+                    "path": rel_path,
                     "user": user,
                     "type": source_type,
                     "modified": datetime.fromtimestamp(
@@ -200,7 +256,8 @@ def scan_sources(since: float, type_filter: str | None, log_root: Path | None = 
     return results
 
 
-def build_manifest(sources: list[dict], mode: str) -> dict:
+def build_manifest(sources: list[dict], mode: str,
+                    promoted_count: int = 0) -> dict:
     """Build the output manifest from collected sources."""
     by_type: dict[str, int] = {}
     by_user: dict[str, int] = {}
@@ -208,7 +265,7 @@ def build_manifest(sources: list[dict], mode: str) -> dict:
         by_type[s["type"]] = by_type.get(s["type"], 0) + 1
         by_user[s["user"]] = by_user.get(s["user"], 0) + 1
 
-    return {
+    result = {
         "last_compile": get_last_compile_iso(),
         "scan_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "mode": mode,
@@ -217,6 +274,9 @@ def build_manifest(sources: list[dict], mode: str) -> dict:
         "by_type": by_type,
         "by_user": by_user,
     }
+    if promoted_count > 0:
+        result["skipped_promoted"] = promoted_count
+    return result
 
 
 def main() -> int:
@@ -264,6 +324,12 @@ def main() -> int:
         action="store_true",
         help="Skip automatic master recompilation for maintainers.",
     )
+    parser.add_argument(
+        "--mark-promoted",
+        dest="mark_promoted",
+        action="store_true",
+        help="Mark scanned sources as promoted in .promoted-sources (run after master compilation).",
+    )
 
     args = parser.parse_args()
 
@@ -295,9 +361,18 @@ def main() -> int:
         if resolved != ROOT:
             log_root = resolved
 
+    # Master compilation skips already-promoted sources (unless --full)
+    skip_promoted = args.master and not args.full
+
+    # Count promoted sources for reporting
+    promoted_count = 0
+    if skip_promoted:
+        promoted_count = len(load_promoted(log_root))
+
     sources = scan_sources(since, args.type_filter, log_root=log_root,
-                           user_filter=args.user_filter)
-    manifest = build_manifest(sources, mode)
+                           user_filter=args.user_filter, master=args.master,
+                           skip_promoted=skip_promoted)
+    manifest = build_manifest(sources, mode, promoted_count=promoted_count)
 
     # Add log repo info to manifest
     if log_root is not None:
@@ -308,6 +383,10 @@ def main() -> int:
 
     if args.touch:
         touch_last_compile()
+
+    if args.mark_promoted and sources:
+        count = mark_promoted(sources, log_root)
+        print(f"Marked {count} source(s) as promoted.", file=sys.stderr)
 
     return 0
 
