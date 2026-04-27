@@ -13,6 +13,54 @@ set -euo pipefail
 # 4. Loads agent registry + facts cache
 # 5. Initializes session stats tracker
 
+# --- Dry-run / argv mode ---
+# Print the resolved launch chain (paths, env, tools, branch plan) without
+# performing any side effects. Useful for security review and debugging.
+#   bash session-start.sh --argv      # human-readable
+#   bash session-start.sh --argv json # JSON
+if [[ "${1:-}" == "--argv" || "${1:-}" == "--dry-run" ]]; then
+  hook_resolve_log_repo 2>/dev/null || true
+  user="$(git -C "$PROJECT_DIR" config user.name 2>/dev/null || echo "${USER:-unknown}")"
+  user="$(printf '%s' "$user" | tr -cd 'a-zA-Z0-9_-')"
+  [[ -z "$user" ]] && user="unknown"
+  short_id="$(date -u +%Y%m%d_%H%M%S)_$$"
+  branch_plan="session/${short_id:0:12}_$(date -u +%Y-%m-%d)"
+  if [[ "${2:-}" == "json" ]]; then
+    audit_lines=""
+    if declare -F hook_tools_audit >/dev/null 2>&1; then
+      audit_lines="$(hook_tools_audit 2>/dev/null | jq -R -s 'split("\n") | map(select(length>0) | split("\t") | {name:.[0], path:.[1], status:.[2]})')"
+    else
+      audit_lines='[]'
+    fi
+    jq -cn \
+      --arg script "$SCRIPT_DIR/session-start.sh" \
+      --arg project "$PROJECT_DIR" \
+      --arg log_repo "${LOG_REPO_DIR:-$PROJECT_DIR}" \
+      --arg user "$user" \
+      --arg branch "$branch_plan" \
+      --arg identity "$PROJECT_DIR/.session-identity" \
+      --arg stats "$PROJECT_DIR/.session-stats" \
+      --argjson tools "$audit_lines" \
+      '{script:$script, project:$project, log_repo:$log_repo, user_planned:$user, branch_planned:$branch, writes:[$identity,$stats], tools:$tools, side_effects:["create branch","fetch/pull origin/main","create log dirs","write .session-identity","write .session-stats"]}'
+  else
+    echo "session-start.sh --argv (dry-run, no side effects)"
+    echo "  script    : $SCRIPT_DIR/session-start.sh"
+    echo "  project   : $PROJECT_DIR"
+    echo "  log_repo  : ${LOG_REPO_DIR:-$PROJECT_DIR}"
+    echo "  user_plan : $user"
+    echo "  branch    : $branch_plan"
+    echo "  writes    : $PROJECT_DIR/.session-identity, $PROJECT_DIR/.session-stats"
+    echo "  side fx   : create session branch; fetch/pull origin/main; mkdir per-user log dirs"
+    echo "  tools     :"
+    if declare -F hook_tools_audit >/dev/null 2>&1; then
+      hook_tools_audit | sed 's/^/              /'
+    else
+      echo "              (hook_tools_audit unavailable)"
+    fi
+  fi
+  exit 0
+fi
+
 # Resolve log repo early (needed for dir creation and facts loading)
 hook_resolve_log_repo 2>/dev/null || true
 

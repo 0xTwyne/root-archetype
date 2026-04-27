@@ -1,0 +1,35 @@
+# tools.lock — pinned absolute paths for hook execution
+#
+# Purpose
+#   Hooks resolve tools via this file instead of $PATH lookups so that PATH
+#   manipulation (alias, shadowed binary, dotfile injection) cannot redirect
+#   a hook's tool invocation to an attacker-controlled binary.
+#
+# Format
+#   TAB-separated, one tool per line:
+#     name<TAB>absolute_path
+#   Lines starting with '#' are comments. Blank lines are ignored.
+#
+# Lifecycle
+#   - This file (tools.lock.example) is the COMMITTED contract: the set of
+#     tools the hooks declare a dependency on, with reasonable Linux defaults.
+#   - The active file is scripts/hooks/lib/tools.lock (gitignored). Generate
+#     it with:  scripts/hooks/lib/tools-init.sh
+#   - Treat upgrades as security events: re-run tools-init.sh deliberately
+#     after package updates and review the diff before continuing.
+#
+# Strict mode
+#   Set ARCHETYPE_HOOK_TOOLS_STRICT=1 to make unpinned tools a hard error.
+#   Default is fail-soft: hook_resolve_tool falls back to `command -v`.
+git	/usr/bin/git
+jq	/usr/bin/jq
+python3	/usr/bin/python3
+gh	/usr/bin/gh
+bash	/usr/bin/bash
+sha256sum	/usr/bin/sha256sum
+find	/usr/bin/find
+sed	/usr/bin/sed
+tr	/usr/bin/tr
+wc	/usr/bin/wc
+date	/usr/bin/date
+stat	/usr/bin/stat

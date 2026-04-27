@@ -119,6 +119,37 @@ schema enforcement, correction detection, etc.). Enable them via
 All hook commands use the `${CLAUDE_PROJECT_DIR:-.}/` prefix for reliable path
 resolution regardless of working directory.
 
+## Security Out of the Box
+
+Root-archetype ships defensive measures so that any clone has a working
+agent-safety baseline before customization. Full reference:
+[`docs/guides/security.md`](docs/guides/security.md).
+
+| Layer | Mechanism | Where |
+|-------|-----------|-------|
+| **Read-side secret protection** | Block agent reads of protected paths | `scripts/hooks/check_secrets_read.sh` (default-on) |
+| **Write-side filesystem boundary** | Prevent writes outside the project tree | `scripts/hooks/check_filesystem_path.sh` (default-on) |
+| **Pre-write secret scan** | Scan staged content for credential patterns | `scripts/hooks/pre-edit-guard.sh` + `lib/secret-patterns.txt` |
+| **Tool pinning** | Hooks resolve `git`/`jq`/`python3`/… via pinned absolute paths instead of `$PATH` | `scripts/hooks/lib/tools.lock` + `hook_resolve_tool` |
+| **Hook/validator drift detection** | sha256-locked tree of `scripts/hooks/` + `scripts/validate/`; tampering fails CI | `HOOKS.lock` + `scripts/validate/validate_hooks_lock.sh` |
+| **Dry-run / argv mode** | Print the launch chain (paths, env, tools, planned writes) without side effects | `session-start.sh --argv`, `session_init.sh --argv` |
+| **Append-only audit trail** | Every tool call logged | `scripts/hooks/post-tool-use-audit.sh` + `scripts/utils/agent_log.sh` (default-on) |
+| **Bounded test execution** | Caps for parallelism/timeouts on agent-issued test runs | `scripts/hooks/check_test_safety.sh` |
+| **Schema/structure invariants** | Agent role + skill + doc-drift validators | `scripts/validate/*.py` |
+| **Session isolation** | Each session runs on its own branch; identity persisted to `.session-identity` | `scripts/hooks/session-start.sh` |
+| **Per-user log/notes scoping** | Cross-session writes routed under `notes/<user>/`, `logs/progress/<user>/` | `lib/log-repo.sh`, `hook_ensure_log_dirs` |
+| **Strict mode escape hatch** | `ARCHETYPE_HOOK_TOOLS_STRICT=1` makes unpinned tools fail hard | env var, see `hook_resolve_tool` |
+
+**One-time setup after cloning:**
+
+```bash
+scripts/hooks/lib/tools-init.sh        # generate per-installation tools.lock
+scripts/validate/update_hooks_lock.sh  # generate HOOKS.lock for this checkout
+```
+
+After upgrades or hook edits, treat both as security events — re-run them
+deliberately and review the diffs before committing.
+
 ## Skills
 
 Skills are reusable methodology definitions that agents load on demand.

@@ -117,6 +117,80 @@ hook_inject_facts() {
   return 1
 }
 
+# --- Resolve a tool to its pinned absolute path ---
+# Reads scripts/hooks/lib/tools.lock if present (TAB-separated: name<TAB>path).
+# Falls back to `command -v` if the tool is not pinned.
+# Set ARCHETYPE_HOOK_TOOLS_STRICT=1 to make unpinned/missing tools a hard error.
+#
+# Usage:
+#   jq_bin="$(hook_resolve_tool jq)" || hook_fail_open "$0" "no jq"
+#   "$jq_bin" -r '.foo' < input.json
+hook_resolve_tool() {
+  local name="${1:?hook_resolve_tool requires a tool name}"
+  local lib_dir lock_file path
+  lib_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  lock_file="$lib_dir/tools.lock"
+
+  if [[ -f "$lock_file" ]]; then
+    # Match exact name in column 1; print column 2.
+    path="$(awk -v n="$name" -F'\t' '
+      /^[[:space:]]*#/ { next }
+      /^[[:space:]]*$/ { next }
+      $1 == n { print $2; exit }
+    ' "$lock_file" 2>/dev/null)"
+    if [[ -n "$path" && -x "$path" ]]; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+  fi
+
+  if [[ "${ARCHETYPE_HOOK_TOOLS_STRICT:-0}" == "1" ]]; then
+    echo "hook_resolve_tool: '$name' not pinned in $lock_file (strict mode)" >&2
+    return 1
+  fi
+
+  # Fail-soft fallback to PATH lookup.
+  path="$(command -v "$name" 2>/dev/null || true)"
+  if [[ -n "$path" ]]; then
+    printf '%s\n' "$path"
+    return 0
+  fi
+
+  echo "hook_resolve_tool: '$name' not found (lock missing/incomplete and not on PATH)" >&2
+  return 1
+}
+
+# --- Verify all declared tools resolve (used by validators / dry-run) ---
+# Prints "name<TAB>path<TAB>status" for each tool declared in tools.lock.example.
+# status ∈ {PINNED, FALLBACK, MISSING}
+hook_tools_audit() {
+  local lib_dir example lock name pinned resolved status
+  lib_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  example="$lib_dir/tools.lock.example"
+  lock="$lib_dir/tools.lock"
+  [[ -f "$example" ]] || { echo "hook_tools_audit: missing $example" >&2; return 1; }
+
+  while IFS=$'\t' read -r name _; do
+    [[ -z "$name" || "$name" =~ ^# ]] && continue
+    pinned=""
+    if [[ -f "$lock" ]]; then
+      pinned="$(awk -v n="$name" -F'\t' '$1 == n { print $2; exit }' "$lock" 2>/dev/null)"
+    fi
+    if [[ -n "$pinned" && -x "$pinned" ]]; then
+      printf '%s\t%s\t%s\n' "$name" "$pinned" "PINNED"
+      continue
+    fi
+    resolved="$(command -v "$name" 2>/dev/null || true)"
+    if [[ -n "$resolved" ]]; then
+      status="FALLBACK"
+      [[ -n "$pinned" ]] && status="STALE"   # pinned but not executable
+      printf '%s\t%s\t%s\n' "$name" "$resolved" "$status"
+    else
+      printf '%s\t%s\t%s\n' "$name" "-" "MISSING"
+    fi
+  done < "$example"
+}
+
 # --- Source log repo resolution utility ---
 _HOOK_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$_HOOK_LIB_DIR/log-repo.sh" ]]; then

@@ -1,0 +1,39 @@
+# HOOKS.lock — sha256 hashes of locked hook/validator files
+#
+# Locked roots: scripts/hooks scripts/validate
+# Excluded:     scripts/hooks/lib/tools.lock
+#
+# Regenerated: 2026-04-27T14:10:29Z
+# By:          scripts/validate/update_hooks_lock.sh
+#
+# A drifted lock means a hook or validator changed since last review.
+# Run 'scripts/validate/validate_hooks_lock.sh --diff' to inspect drift.
+# Re-run this script to acknowledge the changes after review.
+
+794ffd2ae929e704bf60f32296e1f1608642d3664dbc8fbe84630244137c7be5  scripts/hooks/README.md
+7679c5cfbb9882f02bd945af321bf898f7d77cdbcd21c714e852630268d9a1ff  scripts/hooks/agents_reference_guard.sh
+0be11170939b2f8d864e84168be26ae0a22c2147b0c520000292455a26809206  scripts/hooks/agents_schema_guard.sh
+14efaaf2b735520546c7882c27399c839968ffb56fe16ca5791c1573912725c2  scripts/hooks/check_filesystem_path.sh
+06b208385000610854432dc2a87b7e8a7cefd6078d88e9fff94790f36b728709  scripts/hooks/check_secrets_read.sh
+6a53cf171a7e153d6111b56f84621798c3e09f155fd6b72644f734b4da293d8b  scripts/hooks/check_test_safety.sh
+56f7b722f07259f58e850755c0c4d92cfdd911ee1c80484b8707780053ea532f  scripts/hooks/correction-detection.sh
+30715f1831b3fe5cbfb5c972ff8b4692db5bc39e30355c614303c2cfdac104f7  scripts/hooks/lib/hook-utils.sh
+dd6fbb2141fe44ee7f9cf88dfbce160ca66ae78dcd37c64b71999bedec451ba0  scripts/hooks/lib/log-repo.sh
+b86df61cd55cffbf8325431aa7dbdb854217fc64ff2c3187267681412e6fb386  scripts/hooks/lib/secret-patterns.txt
+7c2a03bf16fe68058fc2207e64bbfe0a5e36b28017ab4e0acff103bcb85a6117  scripts/hooks/lib/session-counters.sh
+17a5e21fc99ffbe5d451cc0f9e719dc4e7a6b833b5aaf7cd3d72ee6ea2127897  scripts/hooks/lib/tools-init.sh
+8b43a6229ec7c7e0aaabf3c3d5af3142e5336088316908e7cae7267e0e58ff6f  scripts/hooks/lib/tools.lock.example
+48a1afa3e6a2f1e1d146e204b5c227fc2e52bb74013e342ba7d598e7cfd58e03  scripts/hooks/post-edit-check.sh
+267e978047476877e167137a78f7749cbe926d01cf9b618cafb99a051167324b  scripts/hooks/post-tool-use-audit.sh
+cb1331e57d11145e6d5cdb7433034ef8eb6afa08a2bddde19b1cfd40247e905f  scripts/hooks/pre-edit-guard.sh
+ccdccaa26d4c747bcbf3f13a31cbb1923b4ffb1b1d996413ed47808912deddc5  scripts/hooks/session-end.sh
+79de43e1c3e2200ae0754103363c7f75f483152c3377354f7f47c7a1aef17a4b  scripts/hooks/session-start.sh
+9ec7578620a79edf4d58fbabe617d94e2158ebb2c3691212f87cdd5bceb55299  scripts/hooks/skill_usage_log.sh
+7b95d95e8cef4cae106d669056432574773d779350183554eb8e4d9caed979d6  scripts/hooks/subagent-start.sh
+f06ca96f281369ca7b8500693ad4fc02d303eb4d9cf31ec972689293e11e18fe  scripts/validate/update_hooks_lock.sh
+54191d291c2db06796c9d5b5ac69f20d72e393515c574d40a8849582b00e7cc7  scripts/validate/validate_agents_references.py
+0e9309689b3b260d86dc1a51417454ce6ebddd04cc961a8a83fe385d661ba12e  scripts/validate/validate_agents_structure.py
+d4fa36d64d0cb77fe146fc92c514b9eb7118b2bccaf13d702e8583a3476661a1  scripts/validate/validate_claude_md_consistency.py
+f486b617261382e10c524a1970801a069f4d7e32caad29886aa1b735335401e6  scripts/validate/validate_document_drift.py
+aea7eea958f293874aff0523dd59d093f94c3b588f4f54f30d27ccb9bc53588b  scripts/validate/validate_hooks_lock.sh
+7808b5d6114200991008897df36d83b542641d50cc9ded4dccd68057bace7945  scripts/validate/validate_skills.py
