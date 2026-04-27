@@ -206,6 +206,28 @@ into the root repo's master wiki and research database.
 - **Per-member wiki**: `/project-wiki compile --user <name>` → `<log-repo>/wiki/<name>/`
 - **Master wiki + research**: `/project-wiki compile --master` → `knowledge/wiki/` + `knowledge/research/` (maintainer, auto-triggered)
 
+## Wiki — How to Use, Modify, and Personalize Root-Archetype
+
+[`knowledge/wiki/`](knowledge/wiki/) is the project's compiled reference
+documentation for anyone cloning root-archetype to build a new root repo.
+Each page indexes the source-of-truth files in this repo (`scripts/`,
+`agents/skills/`, `docs/guides/`) and links external references where useful.
+
+| Page | Topic |
+|------|-------|
+| [Project Initialization & Setup](knowledge/wiki/project-initialization.md) | `init-project.sh` quick / guided modes, the `init-wizard` skill |
+| [Engine-Neutral Architecture](knowledge/wiki/engine-neutral-architecture.md) | how the same scaffold runs under Claude Code, Codex, or future engines |
+| [Hook System & Governance Enforcement](knowledge/wiki/hook-system-governance.md) | hook events, default vs optional, CWD-independent invocation |
+| [Security & Hardening](knowledge/wiki/security-hardening.md) | tool pinning, drift detection, dry-run mode, threat model |
+| [Agent Roles & Engineering Standards](knowledge/wiki/agent-roles-standards.md) | 6-section role schema, instruction budget, harness patterns |
+| [Documentation & Governance Hygiene](knowledge/wiki/documentation-governance.md) | `AGENT.md` / README conventions, KB linting, drift validators |
+| [Knowledge Compilation Pipeline](knowledge/wiki/knowledge-compilation-pipeline.md) | two-tier flow from per-user logs/notes to compiled wiki |
+| [Operations: Logging, Audit, and Log Push](knowledge/wiki/operations-logging-audit.md) | audit trail, `agent_log.sh`, `push-logs.sh` worktree pattern |
+| [Multi-Repo Coordination & Child Repos](knowledge/wiki/multi-repo-coordination.md) | registering, syncing, discovering agents across governed children |
+| [Skills Framework & Design Patterns](knowledge/wiki/skills-framework.md) | progressive disclosure, trigger-spec descriptions, adding new skills |
+
+The full index lives at [`knowledge/wiki/README.md`](knowledge/wiki/README.md).
+
 ## Child Repo Management
 
 The root repo governs child repos hierarchically. Shared policy, roles, and
