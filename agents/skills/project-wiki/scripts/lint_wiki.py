@@ -238,32 +238,43 @@ def main() -> int:
     active_dir = ROOT / paths_cfg.get("active_handoffs", "handoffs/active")
     completed_dir = ROOT / paths_cfg.get("completed_handoffs", "handoffs/completed")
     index_path = ROOT / paths_cfg.get("intake_index", "research/intake_index.yaml")
+    if not index_path.exists():
+        knowledge_index = ROOT / "knowledge/research/intake_index.yaml"
+        if knowledge_index.exists():
+            index_path = knowledge_index
     index_patterns = lint_cfg.get("index_patterns", ["*-index.md"])
-
-    if not active_dir.exists():
-        print(f"ERROR: Active handoffs directory not found at {active_dir}")
-        return 1
 
     all_issues: list[Issue] = []
     pass_names = []
+    handoff_lint_available = active_dir.exists()
+    skipped_handoff_msg = "skipped: active handoffs directory not found"
 
     # Pass 1: Orphan handoffs
     if "orphan_handoffs" in enabled:
-        issues = check_orphan_handoffs(active_dir, index_patterns)
-        all_issues.extend(issues)
-        pass_names.append(("Orphan handoffs", issues))
+        if handoff_lint_available:
+            issues = check_orphan_handoffs(active_dir, index_patterns)
+            all_issues.extend(issues)
+            pass_names.append(("Orphan handoffs", issues))
+        else:
+            pass_names.append((f"Orphan handoffs ({skipped_handoff_msg})", []))
 
     # Pass 2: Stale entries
     if "stale_entries" in enabled:
-        issues = check_stale_entries(active_dir, lint_cfg["aging_days"], lint_cfg["stale_days"])
-        all_issues.extend(issues)
-        pass_names.append(("Stale entries", issues))
+        if handoff_lint_available:
+            issues = check_stale_entries(active_dir, lint_cfg["aging_days"], lint_cfg["stale_days"])
+            all_issues.extend(issues)
+            pass_names.append(("Stale entries", issues))
+        else:
+            pass_names.append((f"Stale entries ({skipped_handoff_msg})", []))
 
     # Pass 3: Contradictory status
     if "contradictory_status" in enabled:
-        issues = check_contradictory_status(active_dir, completed_dir)
-        all_issues.extend(issues)
-        pass_names.append(("Contradictory status", issues))
+        if handoff_lint_available:
+            issues = check_contradictory_status(active_dir, completed_dir)
+            all_issues.extend(issues)
+            pass_names.append(("Contradictory status", issues))
+        else:
+            pass_names.append((f"Contradictory status ({skipped_handoff_msg})", []))
 
     # Pass 4: Un-actioned intake
     if "unactioned_intake" in enabled:
@@ -273,9 +284,12 @@ def main() -> int:
 
     # Pass 5: Missing cross-refs
     if "missing_cross_refs" in enabled:
-        issues = check_missing_crossrefs(active_dir, completed_dir)
-        all_issues.extend(issues)
-        pass_names.append(("Missing cross-refs", issues))
+        if handoff_lint_available:
+            issues = check_missing_crossrefs(active_dir, completed_dir)
+            all_issues.extend(issues)
+            pass_names.append(("Missing cross-refs", issues))
+        else:
+            pass_names.append((f"Missing cross-refs ({skipped_handoff_msg})", []))
 
     # Print report
     print("=" * 70)

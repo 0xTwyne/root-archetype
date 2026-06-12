@@ -88,7 +88,7 @@ else
     # Copy tracked content, excluding instance-specific data
     (cd "$ARCHETYPE_DIR" && git ls-files -z 2>/dev/null || find . -type f -not -path './.git/*' -print0) | \
         grep -zvE '^(logs/progress/|notes/.*/handoffs/|notes/handoffs/INDEX)' | \
-        (cd "$ARCHETYPE_DIR" && xargs -0 -I{} bash -c 'mkdir -p "'"$PROJECT_ROOT"'/$(dirname "{}")" && cp "{}" "'"$PROJECT_ROOT"'/{}"')
+        (cd "$ARCHETYPE_DIR" && xargs -0 -I{} bash -c '[[ -f "{}" ]] || exit 0; mkdir -p "'"$PROJECT_ROOT"'/$(dirname "{}")" && cp "{}" "'"$PROJECT_ROOT"'/{}"')
     chmod +x "$PROJECT_ROOT"/scripts/**/*.sh "$PROJECT_ROOT"/scripts/**/*.py 2>/dev/null || true
 fi
 
@@ -119,6 +119,12 @@ mkdir -p knowledge/wiki knowledge/research/deep-dives \
 touch knowledge/wiki/.gitkeep knowledge/research/.gitkeep \
       knowledge/research/deep-dives/.gitkeep \
       local/.gitkeep repos/.gitkeep secrets/.gitkeep 2>/dev/null || true
+
+# --- Seed local prompt templates ---
+if [[ -d agents/prompt-templates/brevity ]]; then
+    mkdir -p local/prompt-templates/brevity
+    cp -R agents/prompt-templates/brevity/. local/prompt-templates/brevity/
+fi
 
 # --- Create log repo ---
 LOG_REPO_NAME="${PROJECT_NAME}-logs"

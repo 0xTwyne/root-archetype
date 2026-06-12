@@ -55,7 +55,8 @@ hook selection, knowledge seeding, and role customization interactively.
 ├── agents/
 │   ├── shared/            # Cross-cutting policy (constraints, standards, workflows)
 │   ├── roles/             # Role overlays (6-section schema per role)
-│   └── skills/            # Engine-neutral skill definitions + catalog
+│   ├── skills/            # Engine-neutral skill definitions + catalog
+│   └── prompt-templates/  # Optional prompt snippets copied to local/ at init
 ├── scripts/
 │   ├── hooks/             # All hooks (5 default, 8 optional) + lib/
 │   ├── validate/          # Governance validators
@@ -166,6 +167,14 @@ Canonical definitions live in `agents/skills/`, with a catalog at
 | `new-handoff` | "new handoff", "track work item" |
 | `init-wizard` | Automatic when `.needs-init` exists |
 | `wrap-up` | "wrap up", mid-session save, checkpoint progress |
+
+## Prompt Templates
+
+`init-project.sh` copies reusable brevity prompt templates from
+`agents/prompt-templates/brevity/` into `local/prompt-templates/brevity/`.
+The tracked copies are project-agnostic source material; the local copies are
+safe to tailor to a team's models, roles, and scoring rubrics without creating
+repo churn.
 
 ## Knowledge Management
 

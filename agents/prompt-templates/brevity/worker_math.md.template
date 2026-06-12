@@ -1,0 +1,15 @@
+# Worker Math Brevity Template
+
+Use this snippet when a math worker should avoid verbose scratchpad-style
+answers while still showing enough work to audit the result.
+
+## Answer Shape
+
+- Multiple-choice: state the option, then the decisive calculation.
+- Numeric answer: put the final number first, then at most three compact steps.
+- Proof/check: give the invariant or theorem used, then the conclusion.
+
+## Guardrail
+
+If the problem is ambiguous, ask one clarifying question or state the assumption
+before computing. Do not compress away units, domains, or edge cases.

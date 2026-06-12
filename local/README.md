@@ -7,10 +7,11 @@ that should not be shared across clones.
 
 ```
 local/
-├── skills/     # Personal skill definitions
-├── hooks/      # Personal hook overrides
-├── notes/      # Personal scratchpad
-└── config/     # Machine-specific configuration
+├── skills/            # Personal skill definitions
+├── hooks/             # Personal hook overrides
+├── notes/             # Personal scratchpad
+├── config/            # Machine-specific configuration
+└── prompt-templates/  # Generated prompt snippets to adapt locally
 ```
 
 ## Usage
@@ -20,6 +21,8 @@ local/
 - **Hooks**: Override or extend hook behavior without modifying tracked files.
 - **Notes**: Scratch space for ideas, experiments, drafts.
 - **Config**: Machine-specific env vars, paths, tool configs.
+- **Prompt templates**: Project-specific copies of tracked templates, such as
+  `agents/prompt-templates/brevity/`.
 
 ## Discovery
 

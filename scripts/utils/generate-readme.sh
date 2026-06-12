@@ -120,7 +120,8 @@ ${REPO_TABLE:-| *(none yet)* | — | — |}
 ├── agents/
 │   ├── shared/            # Cross-cutting policy (constraints, standards, workflows)
 │   ├── roles/             # Role overlays (6-section schema per role)
-│   └── skills/            # Engine-neutral skill definitions (${SKILL_COUNT} skills)
+│   ├── skills/            # Engine-neutral skill definitions (${SKILL_COUNT} skills)
+│   └── prompt-templates/  # Optional prompt snippets copied to local/ at init
 ├── scripts/
 │   ├── hooks/             # Security gates, audit logging (${OPTIONAL_HOOK_COUNT} hooks)
 │   ├── validate/          # Governance validators
@@ -192,6 +193,14 @@ ${SKILL_COUNT} skills available. Canonical definitions in \`agents/skills/\`.
 | \`new-handoff\` | "new handoff", "track work item" |
 | \`init-wizard\` | Automatic when \`.needs-init\` exists |
 | \`wrap-up\` | "wrap up", mid-session save, checkpoint progress |
+
+## Prompt Templates
+
+\`init-project.sh\` copies reusable brevity prompt templates from
+\`agents/prompt-templates/brevity/\` into \`local/prompt-templates/brevity/\`.
+The tracked copies are project-agnostic source material; the local copies are
+safe to tailor to a team's models, roles, and scoring rubrics without creating
+repo churn.
 
 ## Knowledge Management
 
