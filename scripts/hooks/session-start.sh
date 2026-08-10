@@ -166,6 +166,34 @@ if [[ -f "$FACTS_FILE" ]] && [[ -s "$FACTS_FILE" ]]; then
 fi
 
 
+# --- Un-bootstrapped clone detection ---
+# .claude/settings.json is tracked, so this hook runs even in a fresh clone —
+# but the rest of the engine adapters (CLAUDE.md, .claude/skills/,
+# .claude/commands/) are generated and gitignored, so they are missing until
+# someone bootstraps. Regenerate them here: it is local, fast and idempotent.
+# Child repos are NOT cloned here — that needs the network and credentials, and
+# would risk blowing this hook's timeout — so point the operator at bootstrap.
+if [[ ! -f "$PROJECT_DIR/CLAUDE.md" ]] || [[ ! -d "$PROJECT_DIR/.claude/skills" ]]; then
+  if bash "$PROJECT_DIR/scripts/utils/generate-engine.sh" --engine claude \
+          --project-dir "$PROJECT_DIR" >/dev/null 2>&1; then
+    CONTEXT+="\nFRESH CLONE DETECTED — engine adapters were missing and have been regenerated.\n"
+  else
+    CONTEXT+="\nFRESH CLONE DETECTED — engine adapters are missing and could not be regenerated.\n"
+  fi
+  MISSING_REPOS=0
+  if [[ -f "$PROJECT_DIR/repos/repos.json" ]] && command -v jq &>/dev/null; then
+    while IFS= read -r _repo_name; do
+      [[ -n "$_repo_name" ]] || continue
+      [[ -d "$PROJECT_DIR/repos/$_repo_name/.git" ]] || MISSING_REPOS=$((MISSING_REPOS + 1))
+    done < <(jq -r '.repos[]? | select(.clone_url != null and .clone_url != "") | .name' \
+                "$PROJECT_DIR/repos/repos.json" 2>/dev/null || true)
+  fi
+  if [[ "$MISSING_REPOS" -gt 0 ]]; then
+    CONTEXT+="${MISSING_REPOS} child repo(s) under repos/ are not cloned. Run: bash scripts/bootstrap.sh\n"
+  fi
+  CONTEXT+="Restart the session afterwards so the regenerated skills and commands load.\n"
+fi
+
 # --- Guided init detection ---
 if [[ -f "$PROJECT_DIR/.needs-init" ]]; then
   STEPS="$(jq -r '.steps_remaining | join(", ")' "$PROJECT_DIR/.needs-init" 2>/dev/null || echo "unknown")"
