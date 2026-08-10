@@ -57,24 +57,49 @@ if [[ -x "$PROJECT_DIR/scripts/utils/push-logs.sh" ]]; then
 fi
 
 # --- Commit non-log changes on session branch ---
-CURRENT_BRANCH="$(git -C "$PROJECT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")"
+# Failures here are reported loudly on stderr but never abort session end.
+# Silence is the danger: this block decides whether a whole session's work is
+# committed and pushed, so a masked git error means the work is quietly lost.
+warn_session_end() { echo "session-end: WARNING — $*" >&2; }
 
-if [[ "$CURRENT_BRANCH" == session/* ]]; then
-  # Stage everything except logs/ and notes/ (those went to main)
-  CHANGED="$(git -C "$PROJECT_DIR" status --porcelain -- ':!logs/' ':!notes/' 2>/dev/null | wc -l)"
+# Confirm git can actually operate here BEFORE deciding anything from its
+# output. This check must come first: if git cannot read the repo, the branch
+# lookup below silently falls back to "main", the session/* test fails, and the
+# entire commit/push block is skipped without a word. Note also that piping
+# status into `wc -l` would force exit status 0, so a hard git failure (e.g.
+# "dubious ownership") is invisible to the pipeline's exit code.
+if ! git_err="$(git -C "$PROJECT_DIR" rev-parse --git-dir 2>&1 >/dev/null)"; then
+  warn_session_end "cannot read git repo at $PROJECT_DIR — session work NOT committed"
+  [[ -n "$git_err" ]] && echo "$git_err" | sed 's/^/  /' >&2
+else
+  CURRENT_BRANCH="$(git -C "$PROJECT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")"
 
-  if [[ "$CHANGED" -gt 0 ]]; then
-    git -C "$PROJECT_DIR" add -A -- ':!logs/' ':!notes/' 2>/dev/null || true
-    git -C "$PROJECT_DIR" commit -m "Session work: ${SESSION_ID:-unknown}" 2>/dev/null || true
-    GIT_TERMINAL_PROMPT=0 git -C "$PROJECT_DIR" push -u origin "$CURRENT_BRANCH" 2>/dev/null || true
+  if [[ "$CURRENT_BRANCH" == session/* ]]; then
+    # Stage everything except logs/ and notes/ (those went to main)
+    if ! CHANGED="$(git -C "$PROJECT_DIR" status --porcelain -- ':!logs/' ':!notes/')"; then
+      warn_session_end "git status failed — session work NOT committed"
+      CHANGED=""
+    fi
 
-    # Create PR if gh is available
-    if command -v gh &>/dev/null; then
-      gh pr create \
-        --title "Session: ${SESSION_ID:-unknown}" \
-        --body "Automated session PR from $SESSION_USER" \
-        --base main \
-        --head "$CURRENT_BRANCH" 2>/dev/null || true
+    if [[ -n "$CHANGED" ]]; then
+      if ! git -C "$PROJECT_DIR" add -A -- ':!logs/' ':!notes/'; then
+        warn_session_end "git add failed — session work NOT committed"
+      elif ! git -C "$PROJECT_DIR" commit -q -m "Session work: ${SESSION_ID:-unknown}"; then
+        warn_session_end "git commit failed — session work NOT committed"
+      elif ! GIT_TERMINAL_PROMPT=0 git -C "$PROJECT_DIR" push -u origin "$CURRENT_BRANCH"; then
+        warn_session_end "push of $CURRENT_BRANCH failed — work is committed locally but NOT pushed"
+      else
+        # Create PR if gh is available. Only attempted once the push succeeded,
+        # so this can no longer open a PR for a branch that never landed.
+        if command -v gh &>/dev/null; then
+          gh pr create \
+            --title "Session: ${SESSION_ID:-unknown}" \
+            --body "Automated session PR from $SESSION_USER" \
+            --base main \
+            --head "$CURRENT_BRANCH" >/dev/null 2>&1 \
+            || true  # a PR often already exists for this branch; not an error
+        fi
+      fi
     fi
   fi
 fi
