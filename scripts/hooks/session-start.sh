@@ -137,9 +137,19 @@ else
   PULL_STATUS="fetched origin/main"
 fi
 
-# Create session branch
+# Create session branch.
+# A silent failure here is costly: session-end only commits when the current
+# branch matches session/*, so staying on main means the whole session's work
+# is never committed — and nothing would have said so.
+# BRANCH_WARNING is appended to CONTEXT further down: CONTEXT is assigned (not
+# appended to) after this point, so writing to it here would be discarded.
+BRANCH_WARNING=""
 if [[ "$CURRENT_BRANCH" != "$BRANCH_NAME" ]]; then
-  git -C "$PROJECT_DIR" checkout -b "$BRANCH_NAME" 2>/dev/null || true
+  if ! branch_err="$(git -C "$PROJECT_DIR" checkout -b "$BRANCH_NAME" 2>&1 >/dev/null)"; then
+    BRANCH_WARNING="\nWARNING: could not create session branch $BRANCH_NAME — still on $CURRENT_BRANCH.\n"
+    BRANCH_WARNING+="Session-end only auto-commits on a session/* branch, so work here will NOT be committed automatically.\n"
+    [[ -n "$branch_err" ]] && BRANCH_WARNING+="  ${branch_err}\n"
+  fi
 fi
 
 # Log session start
@@ -150,6 +160,7 @@ fi
 
 # --- Build context output ---
 CONTEXT="Session branch: $BRANCH_NAME\nUser: $SESSION_USER\nAudit logging: active (logs/audit/$SESSION_USER/)\n"
+CONTEXT+="${BRANCH_WARNING}"
 
 # Agent registry summary
 if [[ -f "$PROJECT_DIR/agents/registry.json" ]]; then

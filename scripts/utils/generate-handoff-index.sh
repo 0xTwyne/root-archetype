@@ -61,8 +61,23 @@ while IFS= read -r -d '' file; do
 
   # Extract created date: **Created**: YYYY-MM-DD
   created="$(grep -m1 -oP '^\*\*Created\*\*:\s*\K[0-9]{4}-[0-9]{2}-[0-9]{2}' "$file" 2>/dev/null || true)"
+
+  # Then a YYYY-MM-DD_ filename prefix, the convention for new handoffs.
+  if [[ -z "$created" ]] && [[ "$basename" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})_ ]]; then
+    created="${BASH_REMATCH[1]}"
+  fi
+
+  # Then the commit that added the file — the closest thing to a real creation
+  # date, and stable across clones. This must come before the mtime fallback:
+  # mtime is set by checkout, so on any fresh clone every handoff appeared to
+  # have been written today, and regenerating the index silently overwrote real
+  # historical dates with the clone date.
   if [[ -z "$created" ]]; then
-    # Fallback to file modification date
+    created="$(git -C "$ROOT_DIR" log --diff-filter=A --format=%ad --date=short -1 -- "$file" 2>/dev/null || true)"
+  fi
+
+  # Last resort: mtime (untracked file, or not a git repo).
+  if [[ -z "$created" ]]; then
     created="$(date -r "$file" +%Y-%m-%d 2>/dev/null || stat -c %y "$file" 2>/dev/null | cut -d' ' -f1 || echo "unknown")"
   fi
 
