@@ -115,6 +115,18 @@ mapfile -t USERS < <(printf '%s\n' "${USERS[@]}" | sort -u)
       fi
     done
   done
-} > "$INDEX_FILE"
+} > "${INDEX_FILE}.tmp"
 
-echo "generate-handoff-index: wrote $INDEX_FILE (${#ENTRIES[@]} entries, ${#USERS[@]} users)"
+# Only replace the real file when something other than the timestamp changed.
+# Rewriting it unconditionally left the file permanently dirty in git, so
+# push-logs committed and pushed a no-op change on every single run and its
+# "nothing to push" branch could never be reached.
+if [[ -f "$INDEX_FILE" ]] && \
+   diff -q <(grep -v '^> Last updated:' "$INDEX_FILE") \
+           <(grep -v '^> Last updated:' "${INDEX_FILE}.tmp") >/dev/null 2>&1; then
+    rm -f "${INDEX_FILE}.tmp"
+    echo "generate-handoff-index: $INDEX_FILE unchanged (${#ENTRIES[@]} entries, ${#USERS[@]} users)"
+else
+    mv "${INDEX_FILE}.tmp" "$INDEX_FILE"
+    echo "generate-handoff-index: wrote $INDEX_FILE (${#ENTRIES[@]} entries, ${#USERS[@]} users)"
+fi
