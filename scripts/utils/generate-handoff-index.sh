@@ -73,7 +73,10 @@ while IFS= read -r -d '' file; do
   # have been written today, and regenerating the index silently overwrote real
   # historical dates with the clone date.
   if [[ -z "$created" ]]; then
-    created="$(git -C "$ROOT_DIR" log --diff-filter=A --format=%ad --date=short -1 -- "$file" 2>/dev/null || true)"
+    # `tail -1` takes the EARLIEST add, not the latest. A file that was moved
+    # (e.g. handoffs/active -> handoffs/completed) has several add-commits, and
+    # `-1` would report the move date as the creation date.
+    created="$(git -C "$ROOT_DIR" log --diff-filter=A --format=%ad --date=short -- "$file" 2>/dev/null | tail -1 || true)"
   fi
 
   # Last resort: mtime (untracked file, or not a git repo).
