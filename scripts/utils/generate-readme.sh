@@ -93,13 +93,33 @@ This is the **root governance repository** — it coordinates child repos throug
 shared agent policy, hooks, knowledge management, and cross-repo workflows.
 No application code lives here.
 
+## First-Time Setup (after cloning)
+
+> **A fresh clone is not ready to use.** The engine adapter files
+> (\`CLAUDE.md\` / \`CODEX.md\`, \`.claude/settings.json\`, \`.claude/skills/\`,
+> \`.claude/commands/\`) are generated and gitignored, and the child repos under
+> \`repos/\` are gitignored too — so none of them survive a \`git clone\`. Until
+> you bootstrap, **no hooks fire and no skills or commands exist**. Starting an
+> agent session first will *not* set this up for you.
+
+\`\`\`bash
+bash scripts/bootstrap.sh
+\`\`\`
+
+That regenerates the engine adapters, re-clones the child repos recorded in
+\`repos/repos.json\`, rebuilds the agent registry, and verifies the result. It is
+safe to re-run. Then **restart your agent session** so the hooks in
+\`.claude/settings.json\` are loaded.
+
+Check an existing setup at any time with \`bash scripts/session/health_check.sh\`.
+
 ## Getting Started
 
 \`\`\`bash
 # Start an agent session (hooks handle context loading)
 claude  # or codex
 
-# Register a new child repo
+# Register a new child repo (also records it in repos/repos.json)
 scripts/repos/register-repo.sh <name> <path> --purpose "description"
 
 # Sync all registered repos
@@ -122,6 +142,7 @@ ${REPO_TABLE:-| *(none yet)* | — | — |}
 │   ├── roles/             # Role overlays (6-section schema per role)
 │   └── skills/            # Engine-neutral skill definitions (${SKILL_COUNT} skills)
 ├── scripts/
+│   ├── bootstrap.sh       # One-shot setup for a fresh clone (run this first)
 │   ├── hooks/             # Security gates, audit logging (${OPTIONAL_HOOK_COUNT} hooks)
 │   ├── validate/          # Governance validators
 │   ├── session/           # Session lifecycle
