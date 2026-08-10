@@ -50,7 +50,10 @@ fi
 
 # --- Push logs/notes directly to main ---
 if [[ -x "$PROJECT_DIR/scripts/utils/push-logs.sh" ]]; then
-  bash "$PROJECT_DIR/scripts/utils/push-logs.sh" 2>/dev/null || true
+  # stderr is deliberately NOT silenced: push-logs reports real failures there
+  # (lost logs, broken repo access). Keep `|| true` so a failure cannot break
+  # session end, but let the operator actually see it.
+  bash "$PROJECT_DIR/scripts/utils/push-logs.sh" || true
 fi
 
 # --- Commit non-log changes on session branch ---
