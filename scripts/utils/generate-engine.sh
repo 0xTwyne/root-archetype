@@ -12,21 +12,25 @@ set -euo pipefail
 # For codex:  generates CODEX.md only
 
 usage() {
-    echo "Usage: $0 --engine <claude|codex> [--project-dir PATH]"
+    echo "Usage: $0 --engine <claude|codex> [--project-dir PATH] [--force]"
     echo ""
     echo "Options:"
     echo "  --engine       Engine to generate adapters for (required)"
     echo "  --project-dir  Target project directory (default: current directory)"
+    echo "  --force        Overwrite .claude/settings.json, which is tracked in"
+    echo "                 git and normally left alone once it exists"
     exit 1
 }
 
 ENGINE=""
 PROJECT_DIR=""
+FORCE=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --engine) ENGINE="$2"; shift 2 ;;
         --project-dir) PROJECT_DIR="$2"; shift 2 ;;
+        --force) FORCE=true; shift ;;
         -h|--help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -95,10 +99,17 @@ generate_claude() {
     substitute "$PROJECT_DIR/CLAUDE.md"
     echo "  CLAUDE.md"
 
-    # 2. Settings
+    # 2. Settings — TRACKED in git, not a generated artifact, because the hook
+    #    wiring must exist in a fresh clone for anything to run on session
+    #    start. Create it only when missing so a bootstrap never silently
+    #    reverts committed hook changes; --force regenerates deliberately.
     mkdir -p "$PROJECT_DIR/.claude"
-    cp "$ENGINE_DIR/settings.json.tmpl" "$PROJECT_DIR/.claude/settings.json"
-    echo "  .claude/settings.json"
+    if [[ -f "$PROJECT_DIR/.claude/settings.json" ]] && [[ "$FORCE" != "true" ]]; then
+        echo "  .claude/settings.json (kept — tracked file; use --force to regenerate)"
+    else
+        cp "$ENGINE_DIR/settings.json.tmpl" "$PROJECT_DIR/.claude/settings.json"
+        echo "  .claude/settings.json"
+    fi
 
     # 3. Commands — engine-provided first, then project-level ones from
     #    agents/commands/ (engine-neutral definitions shared across engines).
