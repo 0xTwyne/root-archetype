@@ -23,7 +23,7 @@ if [[ ! -d "$REPOS_DIR" ]]; then
 fi
 
 SYNCED=0
-FAILED=0
+SKIPPED=0
 
 for repo_path in "$REPOS_DIR"/*/; do
     [[ -d "$repo_path" ]] || continue
@@ -33,8 +33,13 @@ for repo_path in "$REPOS_DIR"/*/; do
     echo "--- ${name}: ${repo_path} ---"
 
     if [[ ! -d "${repo_path}/.git" ]]; then
-        echo "  SKIP: Not a git repository"
-        ((FAILED++))
+        # Not every directory under repos/ is a git checkout — some hold local
+        # data synced from elsewhere. Nothing to sync is not a sync failure;
+        # bootstrap.sh is what verifies the expected child repos are present.
+        # (Counting it as a failure also aborted this script under `set -e`,
+        # because `((FAILED++))` returns 1 when FAILED is 0.)
+        echo "  SKIP: not a git repository (nothing to sync)"
+        SKIPPED=$((SKIPPED + 1))
         continue
     fi
 
@@ -50,11 +55,11 @@ for repo_path in "$REPOS_DIR"/*/; do
         git -C "$repo_path" pull --rebase 2>&1 | sed 's/^/  /' || echo "  Pull failed (non-critical)"
     fi
 
-    ((SYNCED++))
+    SYNCED=$((SYNCED + 1))
 done
 
 echo ""
-echo "Synced: ${SYNCED}, Failed: ${FAILED}"
+echo "Synced: ${SYNCED}, Skipped: ${SKIPPED}"
 
 # Rebuild agent registry
 echo ""
