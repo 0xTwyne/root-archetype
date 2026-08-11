@@ -15,7 +15,12 @@ if [[ ! -f "$PATTERNS_FILE" ]]; then
 fi
 
 # Get staged diff
-STAGED_DIFF="$(git diff --cached 2>/dev/null || true)"
+# If git itself fails, this must NOT look like "no staged changes" — that
+# would silently skip the secret scan. Fail the scan loudly instead.
+if ! STAGED_DIFF="$(git diff --cached)"; then
+  echo "ERROR: git diff --cached failed — cannot scan staged changes" >&2
+  exit 1
+fi
 
 if [[ -z "$STAGED_DIFF" ]]; then
   echo "No staged changes to scan."

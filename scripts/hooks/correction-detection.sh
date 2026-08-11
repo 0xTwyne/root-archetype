@@ -15,8 +15,13 @@ command -v jq >/dev/null 2>&1 || exit 0
 hook_load_identity
 
 INPUT="$(cat)"
-SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")"
-PROMPT="$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo "")"
+if ! echo "$INPUT" | jq -e . >/dev/null 2>&1; then
+  echo "correction-detection: could not parse hook input as JSON — skipping" >&2
+  exit 0
+fi
+# UserPromptSubmit sends {session_id, prompt, ...} at the top level.
+SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // empty')"
+PROMPT="$(echo "$INPUT" | jq -r '.prompt // empty')"
 
 [[ -z "$PROMPT" ]] && exit 0
 

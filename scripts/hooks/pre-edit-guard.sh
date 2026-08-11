@@ -14,7 +14,12 @@ hook_resolve_log_repo 2>/dev/null || true
 trap 'hook_fail_open "pre-edit-guard" "unexpected error"' ERR
 
 INPUT="$(cat)"
-TOOL_INPUT="$(echo "$INPUT" | jq -r '.tool_input // empty' 2>/dev/null || echo "{}")"
+if ! echo "$INPUT" | jq -e . >/dev/null 2>&1; then
+    echo "pre-edit-guard: could not parse hook input as JSON — allowing" >&2
+    exit 0
+fi
+# Prefer .tool_input; fall back to the whole object for the legacy flat shape.
+TOOL_INPUT="$(echo "$INPUT" | jq -c '.tool_input // .')"
 FILE_PATH="$(echo "$TOOL_INPUT" | jq -r '.file_path // .path // empty' 2>/dev/null || echo "")"
 CONTENT="$(echo "$TOOL_INPUT" | jq -r '.content // .new_string // empty' 2>/dev/null || echo "")"
 

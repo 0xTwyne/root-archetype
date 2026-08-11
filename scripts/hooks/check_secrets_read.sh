@@ -189,6 +189,23 @@ case "$TOOL_NAME" in
             abs_pattern="$pattern"
             [[ "$abs_pattern" != /* ]] && abs_pattern="${PROJECT_DIR}/${abs_pattern}"
 
+            # Basename/substring globs like "*.env" or "*id_rsa*" have no
+            # usable literal prefix: literal_part degraded to "$PROJECT_DIR/"
+            # and rel_pattern to "", so this loop blocked EVERY bash command
+            # that both mentioned any project path and used a read command.
+            # Match on the glob's inner literal instead.
+            if [[ "$pattern" == \** ]]; then
+                inner="${pattern#\*}"
+                inner="${inner%\*}"
+                [[ -z "$inner" ]] && continue
+                if echo "$COMMAND" | grep -qF -- "$inner"; then
+                    if echo "$COMMAND" | grep -qE "(^|[;&|( ]|&&|\|\|)(${READ_CMDS}|${COPY_CMDS}|source|curl)([ 	]|$)"; then
+                        block_secret_access "$pattern (in bash command)"
+                    fi
+                fi
+                continue
+            fi
+
             # For glob patterns, extract the directory or literal part
             # e.g., "secrets/*" → check for "secrets/" in command
             literal_part="${abs_pattern%%\**}"
