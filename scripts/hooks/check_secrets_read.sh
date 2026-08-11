@@ -203,7 +203,12 @@ case "$TOOL_NAME" in
                 [[ -z "$search_str" ]] && continue
                 if echo "$COMMAND" | grep -qF "$search_str"; then
                     # Confirmed the path appears in command — now check it's a file operation
-                    if echo "$COMMAND" | grep -qE "(${READ_CMDS}|${COPY_CMDS}|source|curl)"; then
+                    # Word-boundary match. Without \b these short alternates
+                    # match inside ordinary words — "od" fires on "produced",
+                    # "method", "period" — so any command merely mentioning a
+                    # protected path was blocked. Anchor to a command position:
+                    # start of string, or after a shell separator.
+                    if echo "$COMMAND" | grep -qE "(^|[;&|( ]|&&|\|\|)(${READ_CMDS}|${COPY_CMDS}|source|curl)([ 	]|$)"; then
                         block_secret_access "$pattern (in bash command)"
                     fi
                 fi
