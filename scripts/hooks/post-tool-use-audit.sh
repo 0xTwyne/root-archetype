@@ -2,7 +2,12 @@
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)}"
-source "$PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
+# Fail open (exit 0) but say why — a silent `|| true` here previously left
+# hook_load_identity undefined and killed the script under set -e.
+if ! source "$PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null; then
+  echo "post-tool-use-audit: cannot source lib/hook-utils.sh — skipping audit" >&2
+  exit 0
+fi
 
 set -euo pipefail
 
@@ -34,5 +39,48 @@ if [[ -f "$STATS_FILE" ]]; then
   fi
 fi
 
-# Silent exit — this hook only updates state, never blocks or warns
+# --- Append audit record ---
+# Lands in the log repo (logs/audit/<user>/) when resolvable, else the root
+# repo. On failure: diagnose to stderr, never block the session.
+hook_resolve_log_repo "$PROJECT_DIR" 2>/dev/null || true
+
+case "$TOOL_NAME" in
+  Read|Glob|Grep)          CATEGORY="read" ;;
+  Edit|Write|NotebookEdit) CATEGORY="modify" ;;
+  Bash)                    CATEGORY="execute" ;;
+  Agent|Task)              CATEGORY="delegate" ;;
+  *)                       CATEGORY="other" ;;
+esac
+
+FILE_PATH="$(hook_extract_file_path "$(echo "$INPUT" | jq -c '.tool_input // {}' 2>/dev/null || echo '{}')")"
+
+RECORD="$(jq -cn \
+  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg session "$SESSION_ID" \
+  --arg user "$SESSION_USER" \
+  --arg tool "$TOOL_NAME" \
+  --arg cat "$CATEGORY" \
+  --arg file "$FILE_PATH" \
+  '{ts:$ts, session:$session, user:$user, tool:$tool, category:$cat}
+   + (if $file != "" then {file:$file} else {} end)' 2>/dev/null)" || RECORD=""
+
+if [[ -z "$RECORD" ]]; then
+  echo "post-tool-use-audit: could not build audit record (jq failed)" >&2
+  exit 0
+fi
+
+AUDIT_WRITTEN=""
+for BASE in "${LOG_REPO_DIR:-$PROJECT_DIR}" "$PROJECT_DIR"; do
+  AUDIT_DIR="$BASE/logs/audit/$SESSION_USER"
+  if mkdir -p "$AUDIT_DIR" 2>/dev/null \
+     && echo "$RECORD" >> "$AUDIT_DIR/tool-calls-$(date -u +%Y-%m-%d).jsonl" 2>/dev/null; then
+    AUDIT_WRITTEN="yes"
+    break
+  fi
+done
+if [[ -z "$AUDIT_WRITTEN" ]]; then
+  echo "post-tool-use-audit: could not write audit record under ${LOG_REPO_DIR:-$PROJECT_DIR}/logs/audit/$SESSION_USER or $PROJECT_DIR/logs/audit/$SESSION_USER (check ownership/permissions)" >&2
+fi
+
+# Never blocks — exit 0 even when the audit write failed (diagnosed above)
 exit 0
