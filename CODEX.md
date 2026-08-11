@@ -15,9 +15,38 @@ bash scripts/bootstrap.sh --engine codex
 It clones the child repos listed in `repos/repos.json`, rebuilds the agent
 registry, and verifies the result. Safe to re-run.
 
+## Session lifecycle — run these yourself
+
+Claude Code runs these automatically via hooks. Codex has no hooks, but the
+scripts do not need them — they need to be invoked. **Run them yourself:**
+
+1. **At the START of every session**, before any other work:
+   ```bash
+   bash scripts/hooks/session-start.sh </dev/null
+   ```
+   Creates the `session/<id>_<date>` branch, resolves your identity, prepares
+   log directories, and prints session context — read its output.
+
+2. **At the END of every session**, after your last change:
+   ```bash
+   bash scripts/hooks/session-end.sh </dev/null
+   ```
+   Pushes logs to the knowledge repo, commits all session work on the session
+   branch, pushes it, and opens a PR. Failures are printed loudly — read the
+   output and report any WARNING lines to the operator.
+
+Also write a progress log (`repos/sangha-knowledge/logs/progress/<user>/`)
+before ending — see recent entries there for the format.
+
+Not replicable under Codex: the per-tool-call audit trail (needs harness
+callbacks). Codex sessions are audited coarsely via git history and the
+session logs above.
+
 ## Engine Wiring
 
-- Skills: read directly from `agents/skills/` (no wrapper layer needed)
+- Skills: read directly from `agents/skills/` (no wrapper layer needed) —
+  check `agents/skills/DISCOVERY.md` for the catalog and triggers, and follow
+  a skill's `SKILL.md` when its trigger matches the task
 - Agent roles: `agents/roles/*.md`
 - Shared policy: `agents/shared/*.md`
 
@@ -32,6 +61,6 @@ guards in `scripts/hooks/` do not run here. The engine-agnostic layer does:
 - **CI backstop** (`.github/workflows/protected-paths.yml`): fails any push
   that adds protected files, even if local hooks were bypassed.
 
-Conventions that hooks automate under Claude Code are manual here: create a
-`session/<id>_<date>` branch before working, commit and push your work at
-session end, and write a progress log in the knowledge repo.
+The session lifecycle (branching, end-of-session commit/push, log push) is
+covered by the scripts in the "Session lifecycle" section above — run them at
+session start and end.
