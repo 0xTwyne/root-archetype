@@ -8,7 +8,10 @@ _AGENT_LOG_FILE="${_AGENT_LOG_DIR}/agent_audit.log"
 _AGENT_SESSION_FILE="${_AGENT_LOG_DIR}/.current_session"
 _AGENT_SESSION_STALE_HOURS=4
 
-mkdir -p "$_AGENT_LOG_DIR"
+# Fail open with a diagnostic — an EACCES here (e.g. uid-mismatched dir
+# ownership) must not abort a set -e caller like session-start.sh.
+mkdir -p "$_AGENT_LOG_DIR" 2>/dev/null \
+    || echo "agent_log: cannot create $_AGENT_LOG_DIR (check ownership/permissions)" >&2
 
 _agent_session_id() {
     # Return current session ID, creating if stale or missing
@@ -55,7 +58,8 @@ _agent_log() {
         --arg repo "${_AGENT_LOG_REPO:-}" \
         --arg branch "${_AGENT_LOG_BRANCH:-}" \
         '{ts:$ts, session:$session, level:$level, cat:$cat, msg:$msg, details:$details, repo:$repo, branch:$branch}')
-    echo "$json" >> "$_AGENT_LOG_FILE"
+    echo "$json" >> "$_AGENT_LOG_FILE" 2>/dev/null \
+        || echo "agent_log: cannot append to $_AGENT_LOG_FILE (check ownership/permissions)" >&2
 }
 
 # --- Public API ---
