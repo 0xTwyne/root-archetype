@@ -1,0 +1,65 @@
+name: protected-paths
+
+# Server-side backstop for the client-side guards. Claude Code sessions are
+# guarded by PreToolUse hooks and all git clients by the pre-commit hook in
+# scripts/githooks/ — but a client with hooks bypassed or never installed
+# (fresh clone before bootstrap, Codex, plain git) can still push. This check
+# fails the push's CI if any commit adds a file matching the protected-path
+# patterns, so a leak is loud even when every client-side layer was skipped.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  protected-paths:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for protected paths in changed files
+        run: |
+          set -euo pipefail
+          PATHS_FILE="secrets/.secretpaths"
+          if [[ ! -f "$PATHS_FILE" ]]; then
+            echo "No $PATHS_FILE — nothing to check."
+            exit 0
+          fi
+
+          # Changed files in this event
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            RANGE="origin/${{ github.base_ref }}...HEAD"
+            git fetch --quiet origin "${{ github.base_ref }}"
+          elif [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]] && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
+            RANGE="${{ github.event.before }}..${{ github.sha }}"
+          else
+            RANGE="${{ github.sha }}~1..${{ github.sha }}"
+          fi
+          CHANGED="$(git diff --name-only --diff-filter=ACMR $RANGE || git show --name-only --format= ${{ github.sha }})"
+          echo "Checking $(echo "$CHANGED" | grep -c . || true) changed file(s)"
+
+          BLOCKED=0
+          while IFS= read -r pattern; do
+            pattern="${pattern%%#*}"
+            pattern="$(echo "$pattern" | xargs)"
+            [[ -z "$pattern" || "$pattern" == "~"* || "$pattern" == /* ]] && continue
+            while IFS= read -r f; do
+              [[ -z "$f" ]] && continue
+              base="$(basename "$f")"
+              case "$f" in $pattern) echo "::error file=$f::matches protected pattern '$pattern'"; BLOCKED=1;; esac
+              if [[ "$pattern" != */* ]]; then
+                case "$base" in $pattern) echo "::error file=$f::matches protected pattern '$pattern'"; BLOCKED=1;; esac
+              fi
+              if [[ "$pattern" == */\* && "$f" == "${pattern%\*}"* ]]; then
+                echo "::error file=$f::under protected dir '${pattern%\*}'"; BLOCKED=1
+              fi
+            done <<< "$CHANGED"
+          done < "$PATHS_FILE"
+
+          if [[ "$BLOCKED" -eq 1 ]]; then
+            echo "Protected files were committed. Remove them and rewrite the pushed history."
+            exit 1
+          fi
+          echo "Clean."

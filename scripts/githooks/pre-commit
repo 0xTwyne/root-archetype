@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Engine-agnostic pre-commit guard.
+#
+# The PreToolUse guards in scripts/hooks/ only run under Claude Code. Codex
+# sessions and plain humans get no protection from them, so the two checks
+# that must never depend on the engine live here, at the git layer:
+#   1. Block committing files that match the protected-path patterns.
+#   2. Run the staged-diff secret scan (content-based, fails closed).
+#
+# Installed by scripts/bootstrap.sh via: git config core.hooksPath scripts/githooks
+# Emergency bypass (deliberate, visible): SANGHA_SKIP_GUARDS=1 git commit ...
+
+if [[ "${SANGHA_SKIP_GUARDS:-0}" == "1" ]]; then
+    echo "pre-commit: guards SKIPPED via SANGHA_SKIP_GUARDS=1" >&2
+    exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# --- 1. Protected-path check on staged file names ---
+PATHS_FILE="$REPO_ROOT/secrets/.secretpaths"
+
+if [[ -f "$PATHS_FILE" ]]; then
+    # A failing git command must fail the hook, not look like "nothing staged".
+    if ! STAGED_FILES="$(git diff --cached --name-only --diff-filter=ACMR)"; then
+        echo "pre-commit: ERROR — git diff --cached failed; refusing to commit unchecked" >&2
+        exit 1
+    fi
+
+    BLOCKED=0
+    while IFS= read -r pattern; do
+        pattern="${pattern%%#*}"
+        pattern="${pattern#"${pattern%%[![:space:]]*}"}"
+        pattern="${pattern%"${pattern##*[![:space:]]}"}"
+        [[ -z "$pattern" ]] && continue
+        # Home-directory patterns cannot appear as staged repo paths.
+        [[ "$pattern" == "~"* || "$pattern" == /* ]] && continue
+
+        while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            base="$(basename "$f")"
+            # shellcheck disable=SC2254
+            case "$f" in
+                $pattern) echo "pre-commit: BLOCKED — staged file '$f' matches protected pattern '$pattern'" >&2; BLOCKED=1 ;;
+            esac
+            # Basename globs (*.pem, .env*) must also match nested files.
+            if [[ "$pattern" != */* ]]; then
+                # shellcheck disable=SC2254
+                case "$base" in
+                    $pattern) echo "pre-commit: BLOCKED — staged file '$f' matches protected pattern '$pattern'" >&2; BLOCKED=1 ;;
+                esac
+            fi
+            # Dir globs like "<dir>/*" must match nested paths too.
+            if [[ "$pattern" == */\* && "$f" == "${pattern%\*}"* ]]; then
+                echo "pre-commit: BLOCKED — staged file '$f' is under protected dir '${pattern%\*}'" >&2; BLOCKED=1
+            fi
+        done <<< "$STAGED_FILES"
+    done < "$PATHS_FILE"
+
+    if [[ "$BLOCKED" -eq 1 ]]; then
+        echo "pre-commit: protected files must not be committed. Unstage them (git restore --staged <file>)." >&2
+        exit 1
+    fi
+fi
+
+# --- 2. Content-based secret scan of the staged diff ---
+SCANNER="$REPO_ROOT/agents/skills/safe-commit/scripts/scan-staged.sh"
+if [[ -x "$SCANNER" || -f "$SCANNER" ]]; then
+    if ! bash "$SCANNER"; then
+        echo "pre-commit: staged-diff secret scan failed — commit refused." >&2
+        exit 1
+    fi
+fi
+
+exit 0
