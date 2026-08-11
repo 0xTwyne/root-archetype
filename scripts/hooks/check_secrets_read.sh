@@ -44,8 +44,25 @@ if [[ ${#PATTERNS[@]} -eq 0 ]]; then
 fi
 
 # --- Read tool input from stdin ---
-TOOL_INPUT="$(cat)"
-TOOL_NAME="${CLAUDE_TOOL_NAME:-}"
+# The harness delivers one JSON object on stdin: {tool_name, tool_input:{...}}.
+# This hook previously took the tool name from $CLAUDE_TOOL_NAME, which the
+# harness does not set, so TOOL_NAME was always empty, the case below fell
+# through to *) and the guard never blocked anything. It also read the path
+# fields from the TOP level of that object rather than from .tool_input, so
+# even a correct tool name yielded an empty path. Either fault alone disabled
+# the guard completely. Both shapes are accepted now.
+HOOK_INPUT="$(cat)"
+TOOL_NAME="$(echo "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>/dev/null || echo "")"
+[[ -z "$TOOL_NAME" ]] && TOOL_NAME="${CLAUDE_TOOL_NAME:-}"
+
+# Prefer .tool_input, fall back to the whole object for the flat shape.
+TOOL_INPUT="$(echo "$HOOK_INPUT" | jq -c '.tool_input // .' 2>/dev/null || echo '{}')"
+[[ -z "$TOOL_INPUT" || "$TOOL_INPUT" == "null" ]] && TOOL_INPUT='{}'
+
+# An unparseable payload must not silently disable the guard.
+if ! echo "$HOOK_INPUT" | jq -e . >/dev/null 2>&1; then
+    hook_fail_open "check_secrets_read" "could not parse hook input as JSON"
+fi
 
 # --- Path matching function ---
 # Returns 0 if path matches any protected pattern
