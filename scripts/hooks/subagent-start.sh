@@ -15,8 +15,10 @@ REGISTRY="$PROJECT_DIR/agents/registry.json"
 hook_load_identity
 
 INPUT="$(cat)"
-AGENT_TYPE="$(echo "$INPUT" | jq -r '.agent_type // empty' 2>/dev/null || echo "unknown")"
-MODEL="$(echo "$INPUT" | jq -r '.tool_input.model // "default"' 2>/dev/null || echo "default")"
+# Accept both the lifecycle shape (top-level fields) and the PreToolUse Task
+# shape (fields nested under .tool_input).
+AGENT_TYPE="$(echo "$INPUT" | jq -r '.agent_type // .tool_input.subagent_type // .tool_input.agent_type // empty' 2>/dev/null || echo "unknown")"
+MODEL="$(echo "$INPUT" | jq -r '.tool_input.model // .model // "default"' 2>/dev/null || echo "default")"
 
 # Log subagent start
 if [[ -f "$PROJECT_DIR/scripts/utils/agent_log.sh" ]]; then

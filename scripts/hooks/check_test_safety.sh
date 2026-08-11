@@ -8,7 +8,15 @@ set -euo pipefail
 MAX_WORKERS="${TEST_MAX_WORKERS:-16}"
 
 # Extract command from tool input
-COMMAND=$(cat | jq -r '.command // empty')
+# Harness sends {tool_name, tool_input:{...}} on stdin; accept the legacy
+# flat shape as fallback. Unparseable input fails open, but with a stderr
+# diagnostic instead of silently.
+INPUT="$(cat)"
+if ! echo "$INPUT" | jq -e . >/dev/null 2>&1; then
+    echo "check_test_safety: could not parse hook input as JSON — allowing" >&2
+    exit 0
+fi
+COMMAND="$(echo "$INPUT" | jq -r '.tool_input.command // .command // empty')"
 
 if [[ -z "$COMMAND" ]]; then
     exit 0

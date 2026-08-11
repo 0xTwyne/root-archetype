@@ -122,8 +122,13 @@ READMEEOF
 
 # --- Initial commit ---
 cd "$LOG_REPO_PATH"
-git add -A 2>/dev/null || true
-git commit -m "init: log repo for ${PROJECT_NAME}" 2>/dev/null || true
+# A masked failure here leaves the log repo with no initial commit, and the
+# later `gh repo create --push` then fails confusingly. Report it loudly
+# (but keep going: the rest of init is still useful).
+git add -A || echo "WARNING: git add failed in ${LOG_REPO_PATH}" >&2
+if ! git commit -q -m "init: log repo for ${PROJECT_NAME}"; then
+    echo "WARNING: initial commit failed in ${LOG_REPO_PATH} (check git identity config) — repo has no initial commit" >&2
+fi
 
 # --- Optional GitHub repo ---
 if [[ "$CREATE_GITHUB" == true ]] && command -v gh &>/dev/null; then

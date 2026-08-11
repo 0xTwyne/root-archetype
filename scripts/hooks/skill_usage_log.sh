@@ -27,11 +27,13 @@ else
 import sys, json
 try:
     data = json.load(sys.stdin)
-    # Tool input has 'skill' field
-    print(data.get('tool_input', {}).get('skill', 'unknown'))
-except:
+    # Harness nests tool fields under tool_input; accept flat legacy shape.
+    ti = data.get('tool_input') or {}
+    print(ti.get('skill') or data.get('skill') or 'unknown')
+except Exception as e:
+    print('skill_usage_log: unparseable hook input: %s' % e, file=sys.stderr)
     print('unknown')
-" 2>/dev/null || echo "unknown")
+" || echo "unknown")
 fi
 
 echo "${TIMESTAMP} | ${SKILL_NAME}" >> "$LOG_FILE"

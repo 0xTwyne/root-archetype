@@ -5,7 +5,15 @@ set -euo pipefail
 # Trigger: PreToolUse → Write|Edit
 # Purpose: Validate local markdown references in governance files
 
-FILE_PATH=$(cat | jq -r '.file_path // empty')
+# Harness sends {tool_name, tool_input:{...}} on stdin; accept the legacy
+# flat shape as fallback. Unparseable input fails open, but with a stderr
+# diagnostic instead of silently.
+INPUT="$(cat)"
+if ! echo "$INPUT" | jq -e . >/dev/null 2>&1; then
+    echo "agents_reference_guard: could not parse hook input as JSON — allowing" >&2
+    exit 0
+fi
+FILE_PATH="$(echo "$INPUT" | jq -r '.tool_input.file_path // .file_path // empty')"
 
 if [[ -z "$FILE_PATH" ]]; then
     exit 0
