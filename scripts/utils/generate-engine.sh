@@ -172,11 +172,17 @@ WRAPPER
 generate_codex() {
     echo "Generating Codex adapter files..."
 
-    # 1. Engine doc
+    # 1. Engine doc — TRACKED in git (Codex has no hooks, so a fresh clone
+    #    must ship its instructions). Create only when missing; --force
+    #    regenerates from the template deliberately.
     mkdir -p "$PROJECT_DIR"
-    cp "$ENGINE_DIR/ENGINEDOC.md.tmpl" "$PROJECT_DIR/CODEX.md"
-    substitute "$PROJECT_DIR/CODEX.md"
-    echo "  CODEX.md"
+    if [[ -f "$PROJECT_DIR/CODEX.md" ]] && [[ "$FORCE" != "true" ]]; then
+        echo "  CODEX.md (kept — tracked file; use --force to regenerate)"
+    else
+        cp "$ENGINE_DIR/ENGINEDOC.md.tmpl" "$PROJECT_DIR/CODEX.md"
+        substitute "$PROJECT_DIR/CODEX.md"
+        echo "  CODEX.md"
+    fi
 }
 
 # --- Dispatch ---

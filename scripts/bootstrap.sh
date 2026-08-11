@@ -138,6 +138,20 @@ else
 fi
 echo ""
 
+# --- 2b. Engine-agnostic git hooks ---
+# The PreToolUse guards only run under Claude Code; the git-layer hooks in
+# scripts/githooks/ (protected-path + secret-scan pre-commit) cover Codex
+# sessions and plain humans too.
+if [[ -d "$ROOT_DIR/scripts/githooks" ]]; then
+    if git -C "$ROOT_DIR" config core.hooksPath scripts/githooks; then
+        chmod +x "$ROOT_DIR/scripts/githooks/"* 2>/dev/null || true
+        echo "--- Git hooks: core.hooksPath -> scripts/githooks ---"
+    else
+        warn "could not set core.hooksPath — engine-agnostic commit guards not installed"
+    fi
+    echo ""
+fi
+
 # --- 3. Agent registry / repo sync ---
 echo "--- 3/4 Agent registry ---"
 sync_out=""
