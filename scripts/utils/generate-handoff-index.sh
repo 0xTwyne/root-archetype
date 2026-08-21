@@ -97,8 +97,12 @@ USERS=()
 for entry in "${ENTRIES[@]}"; do
   USERS+=("${entry%%|*}")
 done
-# Deduplicate and sort
-mapfile -t USERS < <(printf '%s\n' "${USERS[@]}" | sort -u)
+# Deduplicate and sort. Guard the empty case: `printf '%s\n' "${ARR[@]}"` on an
+# empty array still prints one blank line, so USERS would become a single
+# empty-string "user" and the index would grow a headerless `## ` section.
+if [[ ${#USERS[@]} -gt 0 ]]; then
+  mapfile -t USERS < <(printf '%s\n' "${USERS[@]}" | sort -u)
+fi
 
 # --- Write INDEX.md ---
 {
