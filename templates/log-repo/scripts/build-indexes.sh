@@ -333,8 +333,9 @@ build_wiki_index() {
       "$TAGS" "$FS" "$UPDATED" "$FS" "$STATUS" >> "$TMPFILE"
   done < <(find "$WIKI_DIR" -name '*.md' -print0 | sort -z)
 
-  # Emit both artifacts even with no articles. A new project's README points at
-  # them, and a missing file reads as a broken build rather than an empty wiki.
+  # Emit both artifacts even with no articles. A missing file reads as a broken
+  # build rather than an empty wiki, and knowledge-metabolism-check.sh treats
+  # their absence as a stopped pipeline.
   if [[ "$TOTAL" -eq 0 ]]; then
     {
       echo "# Wiki Index"
@@ -420,6 +421,32 @@ build_wiki_index() {
 # Run all
 # =============================================================================
 
+# Refresh the semantic search index, if colgrep is installed. wiki-recall.sh
+# queries it; without this the index silently drifts behind the articles and
+# retrieval quietly degrades to the lexical fallback.
+#
+# Hooks and cron inherit a minimal PATH, so look in the user-local bin dirs too.
+refresh_semantic_index() {
+  local d
+  for d in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
+    [[ -d "$d" && ":$PATH:" != *":$d:"* ]] && PATH="$PATH:$d"
+  done
+  command -v colgrep &>/dev/null || return 0
+  [[ -d "$KNOWLEDGE_ROOT/wiki" ]] || return 0
+
+  local out
+  if out="$(cd "$KNOWLEDGE_ROOT" && timeout 120 colgrep init wiki/ 2>&1)"; then
+    # colgrep prints either "Indexed <path> (added: N, ...)" or
+    # "Index is up to date for <path> (N files)" — report whichever came back.
+    local summary
+    summary="$(printf '%s' "$out" | grep -E 'Indexed|up to date' | tail -1 | sed 's|.*/||')"
+    echo "build-indexes: semantic index — ${summary:-refreshed}"
+  else
+    echo "build-indexes: semantic index — refresh failed (retrieval falls back to ripgrep)" >&2
+  fi
+}
+
 build_progress_index
 build_notes_index
 build_wiki_index
+refresh_semantic_index

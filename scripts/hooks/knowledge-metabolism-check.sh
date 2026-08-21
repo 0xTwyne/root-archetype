@@ -22,6 +22,14 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)}"
 source "$PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
 trap 'hook_fail_open "knowledge-metabolism-check" "unexpected error"' ERR
 
+# Hooks inherit a minimal PATH that omits the user-local bin directories, so a
+# tool installed there is invisible and the hook silently takes its fallback
+# path. colgrep installs to one of these two.
+for _d in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
+  [[ -d "$_d" && ":$PATH:" != *":$_d:"* ]] && PATH="$PATH:$_d"
+done
+export PATH
+
 [[ "${KNOWLEDGE_METABOLISM_CHECK:-}" != "0" ]] || hook_silent
 command -v jq &>/dev/null                       || hook_silent
 

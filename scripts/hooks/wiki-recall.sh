@@ -22,6 +22,14 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)}"
 source "$PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
 trap 'hook_fail_open "wiki-recall" "unexpected error"' ERR
 
+# Hooks inherit a minimal PATH that omits the user-local bin directories, so a
+# tool installed there is invisible and the hook silently takes its fallback
+# path. colgrep installs to one of these two.
+for _d in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
+  [[ -d "$_d" && ":$PATH:" != *":$_d:"* ]] && PATH="$PATH:$_d"
+done
+export PATH
+
 INPUT="$(cat)"
 PROMPT="$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo "")"
 SESSION="$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")"
@@ -66,11 +74,18 @@ mapfile -t TERMS < <(
 SCORED="$(mktemp)"
 trap 'rm -f "$SCORED"' EXIT
 
+# colgrep is tried first but must never make retrieval worse: on a cold index
+# it auto-indexes and returns nothing within the timeout, which would silently
+# suppress results ripgrep would have found. So an empty colgrep result falls
+# through to the lexical path rather than being treated as "no matches".
 if command -v colgrep &>/dev/null; then
   QUERY="$(printf '%s ' "${TERMS[@]}")"
   (cd "$WIKI_DIR" && timeout 6 colgrep "$QUERY" . -k 5 -l 2>/dev/null || true) \
-    | awk '{ print 1000 - NR, $0 }' > "$SCORED" || true
-elif command -v rg &>/dev/null; then
+    | grep -E '\.md$' \
+    | awk '{ print 1000 - NR, $0 }' > "$SCORED" 2>/dev/null || true
+fi
+
+if [[ ! -s "$SCORED" ]] && command -v rg &>/dev/null; then
   while IFS= read -r -d '' FILE; do
     BASE="$(basename "$FILE")"
     case "$BASE" in INDEX.md|STALENESS.md|USAGE.md|schema.md|README.md) continue ;; esac
@@ -92,8 +107,6 @@ elif command -v rg &>/dev/null; then
       printf '%s %s\n' "$SCORE" "${FILE#"$WIKI_DIR/"}" >> "$SCORED"
     fi
   done < <(find "$WIKI_DIR" -name '*.md' -print0 2>/dev/null)
-else
-  hook_silent
 fi
 
 [[ -s "$SCORED" ]] || hook_silent
