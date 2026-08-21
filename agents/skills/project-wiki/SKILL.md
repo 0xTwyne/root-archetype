@@ -256,6 +256,6 @@ flag while leaving the article wrong, which is worse than leaving it flagged.
 
 - Lint only reports — does NOT auto-fix.
 - Query synthesizes from existing KB — does NOT fetch external information.
-- Compile reads user streams from the knowledge repo (`repos/$LOG_REPO/`) and writes the compiled wiki back into the same repo, at `repos/$LOG_REPO/wiki/`. Root-level `knowledge/wiki/` is a retired tombstone; `knowledge/taxonomy.yaml` and `knowledge/research/` still live in root.
+- Compile reads user streams from the knowledge repo (`repos/$LOG_REPO/`) and writes the compiled wiki back into the same repo, at `repos/$LOG_REPO/wiki/`. Root-level `knowledge/wiki/` is cloner-facing reference documentation about the governance scaffold itself — a different artifact for a different reader, and never a compilation target. `knowledge/taxonomy.yaml` and `knowledge/research/` also stay in root.
 - `INDEX.md` and `STALENESS.md` are generated. Never hand-edit them — run `bash scripts/build-indexes.sh` instead, which delegates to the knowledge repo's own builder.
 - Scaling thresholds in `wiki.yaml` are advisory only.

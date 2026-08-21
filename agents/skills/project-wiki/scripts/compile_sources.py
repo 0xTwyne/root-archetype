@@ -316,7 +316,7 @@ def main() -> int:
     parser.add_argument(
         "--master",
         action="store_true",
-        help="Run master wiki compilation (all users → root-repo/knowledge/wiki/).",
+        help="Run master wiki compilation (all users → the log repo's wiki/).",
     )
     parser.add_argument(
         "--skip-master",
