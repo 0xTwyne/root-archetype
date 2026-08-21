@@ -49,3 +49,8 @@ CLAUDE.md
 # Codex has no hooks at all, so a fresh clone must ship its instructions
 # (including how to bootstrap). Machine-specific overrides belong in
 # .claude/settings.local.json, which stays ignored.
+
+# Runtime session state, recreated by scripts/utils/agent_log.sh whenever it is
+# missing or older than its staleness window. It was removed from the template
+# once already; ignoring it stops `git add -A` from putting it back.
+logs/.current_session
