@@ -75,8 +75,14 @@ if [[ -z "$COPY_TO" ]]; then
     rm -rf "${PROJECT_ROOT}/.git"
     git init "$PROJECT_ROOT" >/dev/null
     git -C "$PROJECT_ROOT" checkout -b main 2>/dev/null || true
-    # Clean instance-specific data from in-place clone
-    rm -f notes/handoffs/INDEX.md logs/progress/*/*.md 2>/dev/null || true
+    # Clean instance-specific data from in-place clone.
+    # Must match the exclusion list used by copy mode below. A glob of
+    # logs/progress/*/*.md only reaches one level down and misses per-month
+    # subdirectories, and handoffs were not removed at all — so in-place mode
+    # used to leave the previous owner's history in the new project.
+    rm -f notes/handoffs/INDEX.md 2>/dev/null || true
+    find logs/progress -mindepth 2 -name '*.md' -delete 2>/dev/null || true
+    find notes -mindepth 2 -path '*/handoffs/*' -name '*.md' -delete 2>/dev/null || true
 else
     # Copy mode: clone archetype tree to target
     PROJECT_ROOT="$COPY_TO"
