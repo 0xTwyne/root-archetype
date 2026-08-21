@@ -7,35 +7,20 @@ description: End-of-session wrap-up — updates logs, progress report, handoffs,
 
 Update all documentation artifacts to reflect work completed in this session, then push to main.
 
-## Resolving project values
-
-This skill uses three values. Resolve them once, at the start, rather than
-hardcoding them:
-
-```bash
-LOG_REPO=$(jq -r '.log_repo_name' .archetype-manifest.json)      # e.g. repos/$LOG_REPO
-GH_OWNER=$(jq -r '.template_values.GH_USER' .archetype-manifest.json)
-USER_NAME=${SESSION_USER:-$(git config user.name)}
-```
-
-`$USER_NAME` is the per-user directory name under `logs/progress/` and `notes/`.
-If `SESSION_USER` is unset and `git config user.name` looks wrong, ask rather
-than guessing — writing to the wrong user's directory is hard to notice later.
-
 ## Steps
 
 ### 1. Progress Report
 
-- Create or update: `repos/$LOG_REPO/logs/progress/$USER_NAME/YYYY-MM-DD.md`
+- Create or update: `repos/$LOG_REPO/logs/progress/pestopoppa/YYYY-MM-DD.md`
 - Use this format: `# Progress: YYYY-MM-DD` followed by `## Wrap-up: HH:MM UTC` with sections: What was done, Key decisions, Deferred / next (see existing reports for reference)
 - Be factual and specific — include file paths, concrete results, and measured values
 
 ### 2. Handoff Updates
 
-- Check `repos/$LOG_REPO/notes/$USER_NAME/handoffs/` for active handoffs that were advanced by this session
+- Check `repos/$LOG_REPO/notes/pestopoppa/handoffs/` for active handoffs that were advanced by this session
 - Check off completed items, add new findings, note any blockers discovered
 - If a handoff is fully complete, note the completion date and link to the progress report
-- For new cross-user work handoffs: create `repos/$LOG_REPO/notes/$USER_NAME/handoffs/YYYY-MM-DD_to-<recipient>_<topic-slug>.md`
+- For new cross-user work handoffs: create `repos/$LOG_REPO/notes/pestopoppa/handoffs/YYYY-MM-DD_to-<recipient>_<topic-slug>.md`
 
 ### 3. Index Updates
 
@@ -83,7 +68,7 @@ For each repo, report:
 for repo in . repos/*/; do
   [ -d "$repo/.git" ] || continue
   name=$([ "$repo" = "." ] && echo "governance-root" || basename "$repo")
-  [ "$name" = "$LOG_REPO" ] && continue
+  [ "$name" = "sangha-knowledge" ] && continue
 
   uncommitted=$(git -C "$repo" status --porcelain 2>/dev/null | head -10)
   ahead_current=$(git -C "$repo" log --oneline @{u}..HEAD 2>/dev/null | head -10)
@@ -105,13 +90,22 @@ for repo in . repos/*/; do
   fi
 done
 
-# 2. Open PRs authored by the current user across the project's repos
-gh search prs --owner "$GH_OWNER" --author @me --state open \
+# 2. Open PRs authored by the current user across all pestopoppa repos
+gh search prs --owner pestopoppa --author @me --state open \
   --json number,title,url,repository \
   --jq '.[] | "  \(.repository.nameWithOwner)#\(.number) — \(.title)"' \
   | head -30
 
-# 3. For any PR that's old or looks important, fetch its CI/merge state:
+# 3. Open issues across the project's repos. A collaborator may file one
+#    instead of writing a handoff — branches, working trees and PRs will not
+#    surface it, and it is easy to miss for weeks.
+for repo in $(gh repo list "$GH_OWNER" --limit 50 --json nameWithOwner --jq '.[].nameWithOwner' 2>/dev/null); do
+  gh issue list --repo "$repo" --state open --limit 10 \
+    --json number,title,author,updatedAt \
+    --jq '.[] | "  '"$repo"'#\(.number) \(.author.login): \(.title)"' 2>/dev/null
+done | head -30
+
+# 4. For any PR that's old or looks important, fetch its CI/merge state:
 #    gh pr view <N> -R <owner/repo> --json mergeable,mergeStateStatus,reviewDecision,updatedAt
 #    State values: CLEAN (mergeable, CI passed), UNSTABLE (CI failing/pending),
 #                  DIRTY (conflicts), BLOCKED (review required), UNKNOWN (recompute pending)
@@ -121,6 +115,7 @@ Interpret the output and **explicitly classify each finding** before asking the 
 
 - **Stale leftovers** — old session-auto-commit branches with `[gone]` upstream, branches matching squash-merged PRs (verify by checking if branch tip's tree matches a recent main commit), regenerable junk (e.g., session branches that re-introduce gitignored files). Note these as "stale, no action" with the reason.
 - **Genuine unpushed work** — branches with substantive commits not on any remote ref, uncommitted changes that look intentional, open PRs awaiting action.
+- **Open issues** — an issue is a handoff someone chose not to file as one. Read any that are new since the last wrap-up and say what they ask for; do not just count them.
 - **Open PRs** — fetch CI/merge state per PR. UNSTABLE/FAILING/DIRTY means investigate; CLEAN means the maintainer just needs to review.
 
 For each genuine finding, check `MAINTAINERS.json` to determine whether the current user is a maintainer of that repo. Then ask the user what to do.
@@ -134,10 +129,10 @@ bash scripts/utils/push-logs.sh
 ```
 
 This handles:
-- Pulling latest from the log repo's main
+- Pulling latest from sangha-knowledge's main
 - Staging all logs/notes changes
 - Regenerating the handoff index
-- Committing and pushing to the log repo's main branch
+- Committing and pushing to sangha-knowledge's main branch
 
 ### 7. Summary
 
@@ -159,6 +154,13 @@ End with a summary of what was updated:
 
 ## Guidelines
 
+- The running session's own audit file
+  (`logs/audit/<user>/tool-calls-<date>-<session>.jsonl`) is expected to be
+  modified — the PostToolUse hook appends to it on every tool call, including
+  the ones this wrap-up is making. It is a live log, not uncommitted work, and
+  the session-end hook commits it. Do not report it as a finding; do report any
+  *other* audit file that is dirty, since that means a finished session never
+  ended cleanly.
 - Be factual and specific — include file paths and concrete results
 - Note deferred work explicitly so the next session can pick it up
 - Keep progress entries self-contained — a reader shouldn't need other files to understand what happened
