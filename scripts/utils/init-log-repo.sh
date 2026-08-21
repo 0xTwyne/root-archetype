@@ -56,6 +56,32 @@ touch "$LOG_REPO_PATH/logs/.gitkeep" \
       "$LOG_REPO_PATH/notes/handoffs/.gitkeep" \
       "$LOG_REPO_PATH/wiki/.gitkeep" 2>/dev/null || true
 
+# --- Seed wiki schema, index builder, and facts cache ---
+# The wiki is structured the same way logs/ and notes/ are: this script owns
+# the layout, so a new project starts with somewhere obvious to put each kind
+# of article rather than an empty directory and a guess. The log repo also owns
+# its own indexing, so it ships with the builder and the frontmatter spec that
+# builder reads.
+WIKI_CATEGORIES=(concepts repos operations research incidents tooling)
+for _c in "${WIKI_CATEGORIES[@]}"; do
+    mkdir -p "$LOG_REPO_PATH/wiki/$_c"
+    touch "$LOG_REPO_PATH/wiki/$_c/.gitkeep" 2>/dev/null || true
+done
+
+ARCHETYPE_DIR="${ARCHETYPE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
+if [[ -d "$ARCHETYPE_DIR/templates/log-repo" ]]; then
+    mkdir -p "$LOG_REPO_PATH/scripts"
+    cp "$ARCHETYPE_DIR/templates/log-repo/scripts/build-indexes.sh" "$LOG_REPO_PATH/scripts/" 2>/dev/null || true
+    cp "$ARCHETYPE_DIR/templates/log-repo/wiki/schema.md"           "$LOG_REPO_PATH/wiki/"    2>/dev/null || true
+    cp "$ARCHETYPE_DIR/templates/log-repo/wiki/README.md"           "$LOG_REPO_PATH/wiki/"    2>/dev/null || true
+    cp "$ARCHETYPE_DIR/templates/log-repo/notes/facts.md.tmpl"      "$LOG_REPO_PATH/notes/"   2>/dev/null || true
+    chmod +x "$LOG_REPO_PATH/scripts/build-indexes.sh" 2>/dev/null || true
+
+    # Generate INDEX.md and STALENESS.md now, so they exist from the first
+    # commit and nobody mistakes their absence for a broken build.
+    ( cd "$LOG_REPO_PATH" && bash scripts/build-indexes.sh >/dev/null 2>&1 ) || true
+fi
+
 # --- Write .gitignore ---
 cat > "$LOG_REPO_PATH/.gitignore" << 'GIEOF'
 # OS
@@ -99,8 +125,16 @@ so that all team members can push logs without PR friction.
 │   │   └── facts.md           # Cross-session facts cache
 │   └── handoffs/
 │       └── INDEX.md           # Auto-generated aggregate index
-└── wiki/
-    └── <user>/                # Per-member wiki compilations
+└── wiki/                      # Compiled knowledge, shared across users
+    ├── schema.md              # Frontmatter spec and tag vocabulary
+    ├── INDEX.md               # Auto-generated catalog + scope lookup
+    ├── STALENESS.md           # Auto-generated; articles whose sources moved
+    ├── concepts/              # Domain concepts and mechanics
+    ├── repos/                 # Per-repo architecture and conventions
+    ├── operations/            # Procedures, onboarding, governance
+    ├── research/              # Findings and methodology
+    ├── incidents/             # Post-incident knowledge
+    └── tooling/               # Tool and process documentation
 \`\`\`
 
 ## Conventions
@@ -112,12 +146,15 @@ so that all team members can push logs without PR friction.
 
 ## Relationship to Root Repo
 
-The governance root repo (\`${PROJECT_NAME}\`) contains the master wiki, agent
-definitions, hooks, and scripts. This log repo is registered as a child repo
-in the root's \`repos/\` directory.
+The governance root repo (\`${PROJECT_NAME}\`) contains the agent definitions,
+hooks, and scripts. This log repo is registered as a child repo in the root's
+\`repos/\` directory.
 
-Master wiki compilation (by maintainers) reads from this repo and writes to
-the root repo's \`knowledge/wiki/\`.
+The compiled wiki lives **here**, in \`wiki/\`, alongside the per-user streams it
+is compiled from — so an article and its sources stay in one repo. Compile with
+\`/project-wiki compile\`; regenerate the indexes with
+\`bash scripts/build-indexes.sh\`, which also runs from the governance root
+through a thin wrapper of the same name.
 READMEEOF
 
 # --- Initial commit ---

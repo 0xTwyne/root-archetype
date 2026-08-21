@@ -1,6 +1,6 @@
 ---
 name: project-wiki
-description: Lint, query, and maintain the project knowledge base. Use when auditing KB health, searching for compiled knowledge, or checking governance hygiene. Do not use when ingesting new research (use research-intake if available).
+description: Query, lint, compile, create, and refresh the project knowledge wiki at repos/$LOG_REPO/wiki/. Use when auditing KB health, searching compiled knowledge, writing a new article, or updating articles whose sources have changed. Do not use when ingesting new research (use research-intake if available).
 ---
 
 # Project Wiki
@@ -69,34 +69,6 @@ Compile per-user streams into shared knowledge artifacts.
 
 Invoke with: "compile the wiki" / "update knowledge base"
 
-#### Compilation Modes
-
-**Per-member compilation** (any team member):
-```
-python3 agents/skills/project-wiki/scripts/compile_sources.py --user <username>
-```
-- Reads: `<log-repo>/logs/progress/<user>/`, `<log-repo>/notes/<user>/`
-- Writes: `<log-repo>/wiki/<user>/`
-
-**Master compilation** (maintainer only):
-```
-python3 agents/skills/project-wiki/scripts/compile_sources.py --master
-```
-- Reads: all per-member wikis (`<log-repo>/wiki/<user>/`) + notes + progress + research
-- Writes wiki to: `<root-repo>/knowledge/wiki/`
-- Promotes research to: `<root-repo>/knowledge/research/` (curated from `<log-repo>/notes/<user>/research/`)
-
-The `--master` flag includes `wiki/<user>/` directories as source type `member-wiki`,
-so per-member compilations feed into the master synthesis.
-
-When a maintainer compiles their personal wiki, also run master compilation
-automatically unless `--skip-master` is passed. Check `MAINTAINERS.json`
-`global_maintainers` against the current user's email to determine if the
-user is a maintainer.
-
-Resolve the log repo from `.archetype-manifest.json` (`log_repo_name`) via
-the `repos/` directory. Override with `--log-repo <path>` if needed.
-
 #### Step 1: Generate Source Manifest
 
 Run the manifest scanner to identify what needs compilation:
@@ -132,34 +104,65 @@ For each source, identify:
 
 For each topic cluster identified in Step 2:
 
-1. Check if a wiki page already exists in `knowledge/wiki/` for that topic
-2. If yes: read the existing page, merge new findings, update the "Last compiled" date
+Read `repos/$LOG_REPO/wiki/schema.md` first — it is the authoritative
+frontmatter spec, category list and tag vocabulary.
+
+1. Check if a wiki page already exists in `repos/$LOG_REPO/wiki/` for that
+   topic (start from its `INDEX.md`)
+2. If yes: read the existing page, merge new findings, bump `updated:`
 3. If no: create a new page following this structure:
 
 ```markdown
+---
+title: <Topic Title>
+category: <concept|reference|guide|research|incident>
+scope: [<repos this touches>]
+tags: [<from the vocabulary in schema.md>]
+sources:
+  - <path relative to the governance root, or a URL>
+created: <YYYY-MM-DD>
+updated: <YYYY-MM-DD>
+confidence: <verified|inferred|external>
+---
+
 # <Topic Title>
 
-**Category**: <from knowledge/taxonomy.yaml>
-**Confidence**: <verified|inferred|external>
-**Last compiled**: <YYYY-MM-DD>
-**Sources**: <N> documents from <M> users
+> One-sentence summary for agent quick-scan.
 
-## Summary
+## Key Facts
 
-<2-4 paragraph synthesized overview>
-
-## Key Points
-
-- <Actionable finding or decision>
+- <Actionable finding or decision, linked to its source>
 - <Pattern or convention discovered>
 
-## Source References
+## Details
 
-- [source title](../../notes/<user>/handoffs/...) — <what this source contributed>
-- [progress log](../../logs/progress/<user>/2026-04-10.md) — <what was observed>
+<Synthesized explanation>
+
+## Gotchas
+
+- <Hard-won lesson, linked to the session that found it>
+
+## Related
+
+- [other article](../<dir>/<slug>.md) — how it relates
 ```
 
-Filename convention: `knowledge/wiki/<kebab-case-topic>.md`
+**The frontmatter is not decoration.** `INDEX.md` and `STALENESS.md` are
+generated from it. In particular `sources:` drives staleness detection — an
+article is marked STALE when one of its sources has a git commit newer than
+`updated:`. A page written without real source paths will never be flagged for
+refresh.
+
+Filename convention:
+`repos/$LOG_REPO/wiki/<category-dir>/<kebab-case-topic>.md`, where the
+directory follows the category table in `schema.md` (`concepts/`, `repos/`,
+`operations/`, `research/`, `incidents/`, `tooling/`).
+
+After writing, regenerate the indexes:
+
+```bash
+bash scripts/build-indexes.sh
+```
 
 #### Step 4: Update Taxonomy
 
@@ -172,25 +175,16 @@ don't fit existing ones, append them under `categories:` with a description.
 bash scripts/utils/generate-handoff-index.sh
 ```
 
-#### Step 6: Update Compile Timestamp and Mark Promoted
+#### Step 6: Update Compile Timestamp
 
-After successful compilation, update the timestamp and mark sources as promoted:
+After successful compilation:
 ```
 python3 agents/skills/project-wiki/scripts/compile_sources.py --touch
 ```
 
-For master compilation, also mark sources so they are skipped in future runs:
-```
-python3 agents/skills/project-wiki/scripts/compile_sources.py --master --touch --mark-promoted
-```
-
-This writes promoted source paths to `<log-repo>/.promoted-sources`. Future
-`--master` runs skip these, making master compilation incremental across both
-time (`--since` / `.last_compile`) and promotion status.
-
-To force a full master recompilation including already-promoted sources:
-```
-python3 agents/skills/project-wiki/scripts/compile_sources.py --master --full
+Or manually:
+```bash
+date -u +%Y-%m-%dT%H:%M:%SZ > knowledge/research/.last_compile
 ```
 
 #### Compilation Principles
@@ -202,9 +196,66 @@ python3 agents/skills/project-wiki/scripts/compile_sources.py --master --full
 - **Cite sources.** Every claim should trace to a source via the References section.
 - **Confidence levels.** Use `verified` for tested findings, `inferred` for analysis, `external` for third-party.
 
+### Operation 4 — Create
+
+Scaffold a single new article, when you already know the topic and don't need a
+full compile pass.
+
+Invoke with: "create a wiki article on {topic}" / `/project-wiki create {topic}`
+
+1. Read `repos/$LOG_REPO/wiki/schema.md` for the frontmatter spec,
+   category table and tag vocabulary.
+2. Pick the category and therefore the directory:
+
+   | Category | Directory |
+   |----------|-----------|
+   | `concept` | `concepts/` |
+   | `reference` | `repos/` |
+   | `guide` | `operations/` |
+   | `research` | `research/` |
+   | `incident` | `incidents/` |
+
+   Tool and process docs go in `tooling/` with whichever of `guide` /
+   `reference` fits.
+3. Slug the title: lowercase, hyphens, no punctuation.
+4. Gather source material before writing — search
+   `repos/$LOG_REPO/notes/INDEX.md`,
+   `repos/$LOG_REPO/logs/progress/INDEX.md`, and the relevant repo's
+   `AGENT.md` / `CLAUDE.md`. An article written from memory alone has no
+   `sources:` and will never be flagged stale.
+5. Write the article in the Step 3 format above.
+6. Rebuild: `bash scripts/build-indexes.sh`.
+7. Confirm it appears in `wiki/INDEX.md` under the expected directory. If it
+   shows as `uncategorized`, or the link renders oddly, the frontmatter did not
+   parse — check that `---` is the very first line.
+
+### Operation 5 — Refresh
+
+Update articles whose sources have moved on. This is the other half of the
+compile loop: compile adds knowledge, refresh keeps it true.
+
+Invoke with: "refresh the wiki" / `/project-wiki refresh [article]`
+
+1. Read `repos/$LOG_REPO/wiki/STALENESS.md`. It is generated, and lists
+   each stale article with the specific sources that changed and when.
+2. For each stale article (or just the named one):
+   a. Read the current article.
+   b. Read the changed sources it names — the report gives you the paths.
+   c. Work out what actually changed. A source commit does not always mean the
+      article is wrong; often it is still accurate and only `updated:` needs
+      bumping. Say which case it is.
+   d. Present the proposed edit before writing.
+   e. Apply it and set `updated:` to today.
+3. Rebuild: `bash scripts/build-indexes.sh`, and confirm the article has
+   dropped out of `STALENESS.md`.
+
+Do not bump `updated:` without reading the sources. That clears the staleness
+flag while leaving the article wrong, which is worse than leaving it flagged.
+
 ## Gotchas
 
 - Lint only reports — does NOT auto-fix.
 - Query synthesizes from existing KB — does NOT fetch external information.
-- Compile reads all user streams but writes only to shared locations (`knowledge/`, `notes/handoffs/INDEX.md`).
+- Compile reads user streams from the knowledge repo (`repos/$LOG_REPO/`) and writes the compiled wiki back into the same repo, at `repos/$LOG_REPO/wiki/`. Root-level `knowledge/wiki/` is a retired tombstone; `knowledge/taxonomy.yaml` and `knowledge/research/` still live in root.
+- `INDEX.md` and `STALENESS.md` are generated. Never hand-edit them — run `bash scripts/build-indexes.sh` instead, which delegates to the knowledge repo's own builder.
 - Scaling thresholds in `wiki.yaml` are advisory only.

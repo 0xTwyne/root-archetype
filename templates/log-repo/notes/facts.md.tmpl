@@ -1,0 +1,40 @@
+# Cross-Session Facts — {{USER}}
+
+Loaded into every session by `scripts/hooks/session-start.sh`.
+
+**Keep this under 80 lines.** It costs context on every single session, so only
+durable, reusable facts belong here. Anything topical belongs in the wiki
+instead, where `wiki-recall.sh` fetches it on demand when a prompt matches.
+
+Updated when a correction reveals a reusable fact — see
+`scripts/hooks/correction-detection.sh`.
+
+Good entries look like:
+
+- A convention that is not discoverable from the code (why a thing is done a
+  particular way, when the code only shows that it is).
+- A toolchain detail an agent would otherwise rediscover each session (where the
+  venv lives, which test runner, a required env var).
+- A trap that already cost someone time, stated as the rule that avoids it.
+
+Bad entries:
+
+- Anything the repo already records — file layout, git history, CLAUDE.md.
+- Anything true only this week. Put it in a handoff.
+- Long explanations. One or two lines each; link to a wiki article for depth.
+
+## Layout
+
+<!-- Where things live that is not obvious from a directory listing. -->
+
+## Conventions
+
+<!-- Team rules an agent should follow without being told again. -->
+
+## Toolchain
+
+<!-- Interpreters, venvs, test commands, required env vars. -->
+
+## Gotchas
+
+<!-- Traps that have already bitten someone here. -->
