@@ -7,20 +7,38 @@ description: End-of-session wrap-up — updates logs, progress report, handoffs,
 
 Update all documentation artifacts to reflect work completed in this session, then push to main.
 
+## Resolve who and where, first
+
+Do not hardcode a username. Every path below is per-user, and writing into
+someone else's directory is the one mistake here that is hard to notice and
+annoying to unpick.
+
+```bash
+USER_NAME=$(jq -r '.user' .session-identity 2>/dev/null)
+[ -z "$USER_NAME" ] || [ "$USER_NAME" = "null" ] && USER_NAME="${SESSION_USER:-$(gh api user --jq .login 2>/dev/null || git config user.name)}"
+
+LOG_REPO=$(jq -r '.log_repo_name' .archetype-manifest.json)      # -> repos/$LOG_REPO
+GH_OWNER=$(jq -r '.template_values.GH_USER' .archetype-manifest.json)
+```
+
+`.session-identity` is written by `session-start.sh`, which resolves the user
+from `gh api user --jq .login` and falls back to git config. If `$USER_NAME`
+comes out empty or looks wrong, ask rather than guessing.
+
 ## Steps
 
 ### 1. Progress Report
 
-- Create or update: `repos/$LOG_REPO/logs/progress/pestopoppa/YYYY-MM-DD.md`
+- Create or update: `repos/$LOG_REPO/logs/progress/$USER_NAME/YYYY-MM-DD.md`
 - Use this format: `# Progress: YYYY-MM-DD` followed by `## Wrap-up: HH:MM UTC` with sections: What was done, Key decisions, Deferred / next (see existing reports for reference)
 - Be factual and specific — include file paths, concrete results, and measured values
 
 ### 2. Handoff Updates
 
-- Check `repos/$LOG_REPO/notes/pestopoppa/handoffs/` for active handoffs that were advanced by this session
+- Check `repos/$LOG_REPO/notes/$USER_NAME/handoffs/` for active handoffs that were advanced by this session
 - Check off completed items, add new findings, note any blockers discovered
 - If a handoff is fully complete, note the completion date and link to the progress report
-- For new cross-user work handoffs: create `repos/$LOG_REPO/notes/pestopoppa/handoffs/YYYY-MM-DD_to-<recipient>_<topic-slug>.md`
+- For new cross-user work handoffs: create `repos/$LOG_REPO/notes/$USER_NAME/handoffs/YYYY-MM-DD_to-<recipient>_<topic-slug>.md`
 
 ### 3. Index Updates
 
@@ -68,7 +86,7 @@ For each repo, report:
 for repo in . repos/*/; do
   [ -d "$repo/.git" ] || continue
   name=$([ "$repo" = "." ] && echo "governance-root" || basename "$repo")
-  [ "$name" = "sangha-knowledge" ] && continue
+  [ "$name" = "$LOG_REPO" ] && continue   # handled by push-logs.sh in step 6
 
   uncommitted=$(git -C "$repo" status --porcelain 2>/dev/null | head -10)
   ahead_current=$(git -C "$repo" log --oneline @{u}..HEAD 2>/dev/null | head -10)
@@ -90,8 +108,8 @@ for repo in . repos/*/; do
   fi
 done
 
-# 2. Open PRs authored by the current user across all pestopoppa repos
-gh search prs --owner pestopoppa --author @me --state open \
+# 2. Open PRs authored by the current user across the project's repos
+gh search prs --owner "$GH_OWNER" --author @me --state open \
   --json number,title,url,repository \
   --jq '.[] | "  \(.repository.nameWithOwner)#\(.number) — \(.title)"' \
   | head -30
@@ -129,10 +147,10 @@ bash scripts/utils/push-logs.sh
 ```
 
 This handles:
-- Pulling latest from sangha-knowledge's main
+- Pulling latest from the log repo's main
 - Staging all logs/notes changes
 - Regenerating the handoff index
-- Committing and pushing to sangha-knowledge's main branch
+- Committing and pushing to the log repo's main branch
 
 ### 7. Summary
 
