@@ -83,7 +83,13 @@ if [[ -n "$FAIL" ]]; then
 fi
 
 # --- Healthy: one status line, with the stale count if any ---
-STALE_COUNT="$(grep -c '^## \[' "$WIKI_DIR/STALENESS.md" 2>/dev/null || echo 0)"
+# `grep -c` prints its count AND exits 1 when the count is zero. A `|| echo 0`
+# fallback appends a second line ("0\n0") and breaks the arithmetic below;
+# piping to `head` instead lets pipefail propagate grep's 1 and `set -e` kills
+# the script silently. Swallow the status inside the substitution, then
+# validate — both failure modes were hit here before this shape stuck.
+STALE_COUNT="$(grep -c '^## \[' "$WIKI_DIR/STALENESS.md" 2>/dev/null || true)"
+[[ "$STALE_COUNT" =~ ^[0-9]+$ ]] || STALE_COUNT=0
 
 STATUS="Knowledge wiki: ${ARTICLE_COUNT} articles"
 if [[ "$STALE_COUNT" -gt 0 ]]; then
