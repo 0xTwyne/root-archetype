@@ -1,0 +1,14 @@
+# Thinking Reasoning Brevity Template
+
+Use this snippet for models that tend to over-explain reasoning tasks.
+
+## Answer Shape
+
+- Start with the decision or result.
+- Include only the key intermediate facts needed to verify the answer.
+- Keep the final answer suffix under 50 words when the user requested a direct answer.
+
+## Guardrail
+
+For high-risk domains or code changes, prefer a complete verification checklist
+over a terse answer. The goal is concise reasoning, not hidden reasoning.

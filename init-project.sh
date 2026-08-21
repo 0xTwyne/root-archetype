@@ -88,7 +88,7 @@ else
     # Copy tracked content, excluding instance-specific data
     (cd "$ARCHETYPE_DIR" && git ls-files -z 2>/dev/null || find . -type f -not -path './.git/*' -print0) | \
         grep -zvE '^(logs/progress/|notes/.*/handoffs/|notes/handoffs/INDEX)' | \
-        (cd "$ARCHETYPE_DIR" && xargs -0 -I{} bash -c 'mkdir -p "'"$PROJECT_ROOT"'/$(dirname "{}")" && cp "{}" "'"$PROJECT_ROOT"'/{}"')
+        (cd "$ARCHETYPE_DIR" && xargs -0 -I{} bash -c '[[ -f "{}" ]] || exit 0; mkdir -p "'"$PROJECT_ROOT"'/$(dirname "{}")" && cp "{}" "'"$PROJECT_ROOT"'/{}"')
     chmod +x "$PROJECT_ROOT"/scripts/**/*.sh "$PROJECT_ROOT"/scripts/**/*.py 2>/dev/null || true
 fi
 
@@ -202,6 +202,15 @@ if [[ -n "$REPOS" ]]; then
     sed -i "s|{{REPO_MAP_ROWS}}|${REPO_MAP_ROWS}|g" AGENT.md 2>/dev/null || true
 else
     sed -i '/{{REPO_MAP_ROWS}}/d' AGENT.md 2>/dev/null || true
+fi
+
+# --- Seed local prompt templates ---
+# Copied into local/ rather than referenced in place, so a project can adapt
+# them without editing tracked archetype files. local/ is gitignored.
+if [[ -d "$ARCHETYPE_DIR/agents/prompt-templates/brevity" ]]; then
+    mkdir -p "$PROJECT_ROOT/local/prompt-templates/brevity"
+    cp -R "$ARCHETYPE_DIR/agents/prompt-templates/brevity/." \
+          "$PROJECT_ROOT/local/prompt-templates/brevity/"
 fi
 
 # --- Write archetype manifest ---

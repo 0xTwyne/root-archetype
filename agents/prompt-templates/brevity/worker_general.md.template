@@ -1,0 +1,17 @@
+# Worker General Brevity Template
+
+Use this snippet when a general-purpose worker is answering short-form tasks.
+Tune the limits for your benchmark and user tolerance before making them
+mandatory.
+
+## Answer Shape
+
+- Multiple-choice: answer with the option and one short justification sentence.
+- Yes/no: answer yes or no first, then one caveat sentence if needed.
+- Factual lookup: give the answer first, then one source or confidence note.
+- Open-ended: keep the first response under 120 words unless the user asks for depth.
+
+## Guardrail
+
+Do not omit necessary uncertainty, safety constraints, citations, or executable
+steps just to satisfy the word limit. Brevity is subordinate to correctness.

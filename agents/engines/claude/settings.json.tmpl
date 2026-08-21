@@ -9,6 +9,15 @@
             "timeout": 15000
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/knowledge-metabolism-check.sh\"",
+            "timeout": 10000
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -51,6 +60,17 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/post-tool-use-audit.sh\"",
             "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/wiki-recall.sh\"",
+            "timeout": 10000
           }
         ]
       }
