@@ -271,11 +271,40 @@ for check in agents:d .claude/skills:d .claude/commands:d scripts/hooks:d AGENT.
     path="${check%%:*}"; type="${check##*:}"
     [[ ("$type" == d && -d "$path") || ("$type" == f && -f "$path") ]] || { echo "  WARN: Missing $path"; WARN=1; }
 done
-# Validate log repo
-if [[ -d "$LOG_REPO_PATH/.git" ]]; then
-    echo "  Log repo: OK (repos/${LOG_REPO_NAME}/)"
-else
+# Validate log repo.
+#
+# `-d .git` alone is not enough: init-log-repo.sh runs `git init` before it seeds
+# anything, so a run that failed partway still leaves a directory that passes
+# that test. This step therefore reported "Log repo: OK" and "Validation passed"
+# in the same breath as "WARNING: Log repo creation failed". Check for the
+# artifacts a usable log repo must actually have.
+if [[ ! -d "$LOG_REPO_PATH/.git" ]]; then
     echo "  WARN: Log repo not found at ${LOG_REPO_PATH}"; WARN=1
+else
+    LOG_MISSING=""
+    for _needed in \
+        AGENT.md \
+        README.md \
+        identities.json \
+        wiki/schema.md \
+        scripts/build-indexes.sh; do
+        [[ -f "$LOG_REPO_PATH/$_needed" ]] || LOG_MISSING+=" $_needed"
+    done
+    for _needed_dir in logs/progress logs/audit notes wiki; do
+        [[ -d "$LOG_REPO_PATH/$_needed_dir" ]] || LOG_MISSING+=" $_needed_dir/"
+    done
+    # An initial commit matters on its own: without one, `gh repo create --push`
+    # fails confusingly later, and the repo cannot be cloned by a collaborator.
+    if ! git -C "$LOG_REPO_PATH" rev-parse HEAD >/dev/null 2>&1; then
+        LOG_MISSING+=" (no initial commit)"
+    fi
+
+    if [[ -z "$LOG_MISSING" ]]; then
+        echo "  Log repo: OK (repos/${LOG_REPO_NAME}/)"
+    else
+        echo "  WARN: Log repo at ${LOG_REPO_PATH} is incomplete —${LOG_MISSING}"
+        WARN=1
+    fi
 fi
 [[ "$ENGINE" == claude ]] && for f in CLAUDE.md .claude/settings.json; do
     [[ -f "$f" ]] || { echo "  WARN: Missing $f"; WARN=1; }
