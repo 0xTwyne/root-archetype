@@ -29,8 +29,11 @@ if [ -z "$USER_NAME" ] || [ "$USER_NAME" = "null" ]; then
   USER_NAME=$(printf '%s' "$USER_NAME" | tr -cd 'a-zA-Z0-9_-')
 fi
 
-LOG_REPO=$(jq -r '.log_repo_name' .archetype-manifest.json)      # -> repos/$LOG_REPO
-GH_OWNER=$(jq -r '.template_values.GH_USER' .archetype-manifest.json)
+# tr -d '\r' on every jq read: the Windows jq writes stdout in text mode, so a
+# bare CR rides along and survives $( ). Unstripped, LOG_REPO names no directory
+# and GH_OWNER corrupts every gh URL built from it.
+LOG_REPO=$(jq -r '.log_repo_name' .archetype-manifest.json | tr -d '\r')      # -> repos/$LOG_REPO
+GH_OWNER=$(jq -r '.template_values.GH_USER' .archetype-manifest.json | tr -d '\r')
 ```
 
 Written as `if/then` deliberately. The earlier one-liner
@@ -129,10 +132,9 @@ and the cross-session summary is `repos/$LOG_REPO/logs/agent_audit.log`.
 
 Both live in the log repo and nowhere else. If you find audit entries under the
 ROOT repo's `logs/`, something is resolving the log repo wrongly — that is a
-finding, not a duplicate to tidy away. This has happened: a writer that resolved
-to `<root>/logs` unconditionally kept appending there for months after the log
-repo was split out, accumulating entries that existed in the log repo nowhere at
-all. Nothing errored.
+finding, not a duplicate to tidy away. This has happened: a writer resolving to
+`<root>/logs` unconditionally kept appending there for months, accumulating
+entries that existed in the log repo nowhere at all. Nothing errored.
 
 ### 6. Unpushed-Work Survey
 
@@ -141,14 +143,15 @@ Survey every repo under `repos/` plus the root repo for unpushed work and open P
 For each repo, report:
 
 ```bash
-# Fresh shell — re-derive. See "Resolve who and where, first".
-LOG_REPO=$(jq -r '.log_repo_name' .archetype-manifest.json)
-GH_OWNER=$(jq -r '.template_values.GH_USER' .archetype-manifest.json)
+# Fresh shell — re-derive. See "Resolve who and where, first", including the
+# tr -d '\r' on each jq read.
+LOG_REPO=$(jq -r '.log_repo_name' .archetype-manifest.json | tr -d '\r')
+GH_OWNER=$(jq -r '.template_values.GH_USER' .archetype-manifest.json | tr -d '\r')
 
 # 1. Survey every git repo (root + repos/*)
 for repo in . repos/*/; do
   [ -d "$repo/.git" ] || continue
-  name=$([ "$repo" = "." ] && echo "sangha-root" || basename "$repo")
+  name=$([ "$repo" = "." ] && echo "<project-root>" || basename "$repo")
   [ "$name" = "$LOG_REPO" ] && continue   # handled by push-logs.sh in step 8
 
   uncommitted=$(git -C "$repo" status --porcelain 2>/dev/null | head -10)
@@ -280,8 +283,9 @@ End with a summary of what was updated:
   uses them. The failure is silent: `gh search prs --owner ""` searches nothing
   and reports no error.
 - **Never write to the root repo.** Logs, progress reports, notes, handoffs and
-  the wiki live in the log repo only. Root is not a fallback — a resolver that
-  treats it as one produces duplicate, drifting content that nothing reads.
+  the wiki live in the log repo only. Root is not a fallback. It still carries
+  April-era duplicates from before the split because an earlier version of the
+  resolver treated it as one.
 - **Check the log repo exists before writing anything.** `repos/<log-repo>/` is
   gitignored by root, so writing there without the clone present creates an
   untracked directory and raises no error at any stage.

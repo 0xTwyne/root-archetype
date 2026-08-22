@@ -12,6 +12,14 @@
 # Sets LOG_REPO_DIR (exported) and returns 0 on success.
 # On failure: leaves LOG_REPO_DIR unset, sets LOG_REPO_MISSING to the expected
 # path, and returns 1. Idempotent — skips if already resolved.
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
+
 hook_resolve_log_repo() {
   # Already resolved this session
   if [[ -n "${LOG_REPO_DIR:-}" ]]; then return 0; fi

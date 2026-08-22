@@ -3,6 +3,14 @@
 # Usage: source scripts/utils/agent_log.sh
 
 # Resolve log directory: prefer log repo if available, fall back to root repo
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
+
 _AGENT_LOG_DIR="${AGENT_LOG_DIR:-${LOG_REPO_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || echo ".")}/logs}"
 _AGENT_LOG_FILE="${_AGENT_LOG_DIR}/agent_audit.log"
 _AGENT_SESSION_FILE="${_AGENT_LOG_DIR}/.current_session"

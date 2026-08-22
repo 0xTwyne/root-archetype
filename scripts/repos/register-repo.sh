@@ -4,6 +4,14 @@ set -euo pipefail
 # Register a child repo with the root governance repo
 # Usage: register-repo.sh <name> <path> [--purpose "description"]
 
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
+
 usage() {
     echo "Usage: $0 <name> <path> [--purpose \"description\"] [--no-scaffold]"
     echo ""

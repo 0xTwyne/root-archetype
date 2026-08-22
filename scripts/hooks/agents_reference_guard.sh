@@ -8,6 +8,14 @@ set -euo pipefail
 # Harness sends {tool_name, tool_input:{...}} on stdin; accept the legacy
 # flat shape as fallback. Unparseable input fails open, but with a stderr
 # diagnostic instead of silently.
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
+
 INPUT="$(cat)"
 if ! echo "$INPUT" | jq -e . >/dev/null 2>&1; then
     echo "agents_reference_guard: could not parse hook input as JSON — allowing" >&2

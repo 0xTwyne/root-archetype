@@ -7,6 +7,14 @@ set -euo pipefail
 # Default: in-place init (CWD is the cloned archetype, transforms in place)
 # Legacy:  --copy-to <path>  copies archetype to a new directory
 
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
+
 usage() {
     cat <<'USAGE'
 Usage: init-project.sh <project-name> [options]

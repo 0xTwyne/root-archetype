@@ -193,6 +193,11 @@ hook_tools_audit() {
 
 # --- Source log repo resolution utility ---
 _HOOK_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+# CR-safe jq for every hook that sources this file. See the file for why.
+if [[ -f "$_HOOK_LIB_DIR/../../lib/cr-safe-jq.sh" ]]; then
+  source "$_HOOK_LIB_DIR/../../lib/cr-safe-jq.sh"
+fi
 if [[ -f "$_HOOK_LIB_DIR/log-repo.sh" ]]; then
   source "$_HOOK_LIB_DIR/log-repo.sh"
 fi

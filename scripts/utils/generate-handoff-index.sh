@@ -14,6 +14,14 @@ set -euo pipefail
 # repo, found no per-user handoff directories, and wrote an empty INDEX.md into
 # the root repo's notes/ — which is a documentation stub. push-logs.sh always
 # passes an explicit path, so only a direct call hit it.
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
+
 _repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 _default_dir="$_repo_root"
 if [[ -f "$_repo_root/.archetype-manifest.json" ]] && command -v jq >/dev/null 2>&1; then
