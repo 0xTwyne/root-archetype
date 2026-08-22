@@ -41,3 +41,21 @@ CODEX.md
 .claude/commands/
 .claude/skills/
 .claude/worktrees/
+
+# --- Archetype development logs stay LOCAL ---
+# This repo is the template, not a workspace. Progress reports, audit trails and
+# notes produced by working ON the archetype are the developer's history, not
+# template content — and this repo is public. Only the skeleton is tracked.
+# (Same rules as 0xTwyne/root-archetype PR #34; applied here so they hold now.)
+logs/progress/*
+!logs/progress/.gitkeep
+logs/audit/*
+!logs/audit/.gitkeep
+logs/skills/*
+!logs/skills/.gitkeep
+notes/*/
+!notes/handoffs/
+notes/handoffs/*
+!notes/handoffs/.gitkeep
+!notes/handoffs/INDEX.md
+logs/.current_session
