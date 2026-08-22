@@ -52,6 +52,28 @@ separate log repo. Resolve from `.archetype-manifest.json` → `log_repo_name`.
 - `local/hooks/` — personal hooks (gitignored)
 - `local/notes/` — personal scratchpad (gitignored)
 
+## Scratch Space
+
+- `tmp/` — shared throwaway working space (directory tracked, contents gitignored)
+
+Use `tmp/` for anything a session produces that should not be committed:
+experiment output, intermediate data, a scratch clone of a child repo. Use
+`local/notes/` instead for personal material that should persist across sessions.
+
+Two properties matter, and both come from it being *inside the repo but ignored*:
+
+- Ignored paths are never staged by `git add -A`, so nothing in `tmp/` can be
+  swept into a session PR by the session-end hook.
+- It is still readable by every other session and collaborator working from the
+  root clone — unlike a directory outside the tree, which no one else can reach
+  and the wrap-up survey cannot see.
+
+Do not put working files in a sibling directory outside the root clone. Nothing
+there is visible to anyone else, and `scripts/hooks/check_filesystem_path.sh`
+refuses to write to it anyway. Nothing in `tmp/` is backed up or survives a clean
+checkout — work meant to outlive the session belongs on a branch of the repo it
+came from.
+
 ## Session Management
 
 - `scripts/session/session_init.sh` — initialize session, verify environment

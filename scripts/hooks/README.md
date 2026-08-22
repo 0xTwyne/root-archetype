@@ -11,6 +11,7 @@ points to paths here.
 | `session-end.sh` | SessionEnd | Write progress, push logs, commit session work |
 | `check_secrets_read.sh` | PreToolUse (Read/Glob/Grep/Bash) | Block reads of protected paths |
 | `check_filesystem_path.sh` | PreToolUse (Write/Edit) | Prevent writes outside project |
+| `check_clone_destination.sh` | PreToolUse (Bash) | Prevent `git clone` / `git worktree add` landing outside project |
 | `post-tool-use-audit.sh` | PostToolUse | Append-only audit trail logging |
 
 ## Optional Hooks (shipped but not wired by default)
