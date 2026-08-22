@@ -79,7 +79,7 @@ if [[ -f .claude/settings.json ]] && command -v jq &>/dev/null; then
     HOOK_COUNT="$(jq '[.hooks[] | .[].hooks | length] | add // 0' .claude/settings.json 2>/dev/null || echo 0)"
 fi
 OPTIONAL_HOOK_COUNT="$(find scripts/hooks -maxdepth 1 -name '*.sh' 2>/dev/null | wc -l)"
-SKILL_COUNT="$(find agents/skills -maxdepth 2 -name 'SKILL.md' 2>/dev/null | wc -l)"
+SKILL_COUNT="$(find .claude/skills -maxdepth 2 -name 'SKILL.md' 2>/dev/null | wc -l)"
 
 # --- Generate README ---
 cat > README.md << READMEEOF
@@ -95,11 +95,11 @@ No application code lives here.
 
 ## First-Time Setup (after cloning)
 
-> **A fresh clone is not ready to use.** The engine adapter files
-> (\`CLAUDE.md\` / \`CODEX.md\`, \`.claude/settings.json\`, \`.claude/skills/\`,
-> \`.claude/commands/\`) are generated and gitignored, and the child repos under
-> \`repos/\` are gitignored too — so none of them survive a \`git clone\`. Until
-> you bootstrap, **no hooks fire and no skills or commands exist**. Starting an
+> **A fresh clone has working hooks and skills already.** \`CLAUDE.md\` /
+> \`CODEX.md\`, \`.claude/settings.json\`, \`.claude/skills/\` and
+> \`.claude/commands/\` are **tracked in git**, so cloning delivers them and a
+> later \`git pull\` delivers new skills. What a clone does *not* have is the
+> child repos under \`repos/\`, which are gitignored. Starting an
 > agent session first will *not* set this up for you.
 
 \`\`\`bash
@@ -140,7 +140,8 @@ ${REPO_TABLE:-| *(none yet)* | — | — |}
 ├── agents/
 │   ├── shared/            # Cross-cutting policy (constraints, standards, workflows)
 │   ├── roles/             # Role overlays (6-section schema per role)
-│   └── skills/            # Engine-neutral skill definitions (${SKILL_COUNT} skills)
+│   └── prompt-templates/  # Optional prompt snippets copied to local/ at init
+├── .claude/               # TRACKED: settings, skills (${SKILL_COUNT}), commands
 ├── scripts/
 │   ├── bootstrap.sh       # One-shot setup for a fresh clone (run this first)
 │   ├── hooks/             # Security gates, audit logging (${OPTIONAL_HOOK_COUNT} hooks)
@@ -201,7 +202,8 @@ for reliable path resolution. See \`scripts/hooks/README.md\`.
 
 ## Skills
 
-${SKILL_COUNT} skills available. Canonical definitions in \`agents/skills/\`.
+${SKILL_COUNT} skills available at \`.claude/skills/{name}/SKILL.md\` — that file
+is the skill, tracked in git. No wrapper layer, no generation step.
 
 | Skill | Trigger |
 |-------|---------|
@@ -213,6 +215,14 @@ ${SKILL_COUNT} skills available. Canonical definitions in \`agents/skills/\`.
 | \`new-handoff\` | "new handoff", "track work item" |
 | \`init-wizard\` | Automatic when \`.needs-init\` exists |
 | \`wrap-up\` | "wrap up", mid-session save, checkpoint progress |
+
+## Prompt Templates
+
+\`init-project.sh\` copies reusable brevity prompt templates from
+\`agents/prompt-templates/brevity/\` into \`local/prompt-templates/brevity/\`.
+The tracked copies are project-agnostic source material; the local copies are
+safe to tailor to a team's models, roles, and scoring rubrics without creating
+repo churn.
 
 ## Knowledge Management
 
