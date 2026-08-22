@@ -19,7 +19,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
-CANONICAL_SKILLS_DIR = REPO_ROOT / "agents" / "skills"
+
+# There is no longer a canonical/wrapper split. `.claude/skills/<name>/SKILL.md`
+# IS the skill and is tracked in git. The previous two-tier arrangement — content
+# in an agents/skills tree, generated wrappers in a gitignored .claude/skills/ —
+# meant a committed skill reached nobody, so it was removed.
 KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 TOOL_PATTERN_RE = re.compile(r"^[A-Za-z]+\(.*\)$")
 TRIGGER_PHRASES = ["Use when", "Trigger when", "TRIGGER when", "Do NOT use"]
@@ -58,16 +62,13 @@ def validate_skill(skill_dir):
 
     text = skill_md.read_text(encoding="utf-8")
 
-    # Detect thin wrapper pattern — defer content checks to canonical file
-    is_wrapper = "agents/skills/" in text and "Read and follow" in text
-    canonical_text = ""
-    if is_wrapper:
-        canonical = CANONICAL_SKILLS_DIR / name / "SKILL.md"
-        if canonical.exists():
-            canonical_text = canonical.read_text(encoding="utf-8")
-        else:
-            issues.append(("ERROR", f"Wrapper references agents/skills/{name}/SKILL.md but file not found"))
-            return issues
+    # A leftover generated wrapper is a defect now, not a supported form: it
+    # points at a tree that no longer exists, so the skill has no content.
+    if "Read and follow the instructions in" in text and len(text.splitlines()) < 15:
+        issues.append(("ERROR",
+            "Looks like a leftover generated wrapper. .claude/skills/ is tracked now; "
+            "this file should contain the skill itself."))
+        return issues
 
     # Check frontmatter
     fm, body = parse_frontmatter(text)
@@ -106,7 +107,7 @@ def validate_skill(skill_dir):
 
     # Check for Gotchas section (in canonical file for wrappers, in body for standalone)
     gotchas_pattern = re.compile(r"^##\s+(Gotchas|Common Issues)", re.MULTILINE)
-    check_text = canonical_text if is_wrapper else body
+    check_text = body
     if not gotchas_pattern.search(check_text):
         issues.append(("ERROR", "Missing ## Gotchas or ## Common Issues section"))
 
@@ -127,7 +128,7 @@ def main():
     if not SKILLS_DIR.exists():
         print(f"Skills directory not found: {SKILLS_DIR}")
         print("  (This is expected if the engine adapter has not been generated.)")
-        print("  Run: bash scripts/utils/generate-engine.sh --engine claude")
+        print("  .claude/skills/ is tracked in git — add the SKILL.md and commit it.")
         sys.exit(0)
 
     skill_dirs = sorted(
@@ -154,14 +155,6 @@ def main():
             if level == "ERROR":
                 errors += 1
             else:
-                warnings += 1
-
-    # Check that each .claude/skills/ wrapper has a corresponding agents/skills/ canonical
-    if CANONICAL_SKILLS_DIR.exists():
-        for skill_dir in skill_dirs:
-            canonical = CANONICAL_SKILLS_DIR / skill_dir.name / "SKILL.md"
-            if not canonical.exists():
-                print(f" WARN {skill_dir.name}: no canonical definition at agents/skills/{skill_dir.name}/SKILL.md")
                 warnings += 1
 
     print(f"\n{len(skill_dirs)} skills checked: {errors} errors, {warnings} warnings")

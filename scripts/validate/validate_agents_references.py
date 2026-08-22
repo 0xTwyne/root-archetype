@@ -25,6 +25,7 @@ _BASENAME_SEARCH_DIRS = [
     ".claude/commands",
     ".claude/skills",
     "agents/shared",
+    "agents/roles",
     "agents",
 ]
 
@@ -47,6 +48,29 @@ def _is_non_path_ref(ref: str) -> bool:
     if "your-" in ref or "my-" in ref or "example" in ref.lower():
         return True
     return False
+
+
+def _gitignored(repo_root, refs: list) -> set:
+    """Return the subset of refs that git ignores.
+
+    A documented path that git ignores — .claude/settings.local.json, child
+    repos under repos/ — is absent from a fresh clone by design. Requiring it to
+    exist makes this validator pass on a configured machine and fail on a clone,
+    which inverts what it is for.
+    """
+    import subprocess
+    if not refs:
+        return set()
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), "check-ignore", "--stdin"],
+            input="\n".join(refs), capture_output=True, text=True, timeout=15,
+        )
+    except Exception:
+        return set()
+    if proc.returncode not in (0, 1):
+        return set()
+    return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
 
 
 def validate():
@@ -80,6 +104,11 @@ def validate():
             )
             if not found:
                 broken.append((f.name, ref))
+
+    # Drop anything git ignores — absent from a clone by design, not broken.
+    if broken:
+        ignored = _gitignored(repo_root, sorted({r for _, r in broken}))
+        broken = [(src, r) for src, r in broken if r not in ignored]
 
     if broken:
         print("Reference validation FAILED — broken references:")

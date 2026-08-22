@@ -44,8 +44,8 @@ session logs above.
 
 ## Engine Wiring
 
-- Skills: read directly from `agents/skills/` (no wrapper layer needed) —
-  check `agents/skills/DISCOVERY.md` for the catalog and triggers, and follow
+- Skills: read directly from `.claude/skills/` (tracked in git, no wrapper layer) —
+  check `.claude/skills/DISCOVERY.md` for the catalog and triggers, and follow
   a skill's `SKILL.md` when its trigger matches the task
 - Agent roles: `agents/roles/*.md`
 - Shared policy: `agents/shared/*.md`

@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # Log repo resolution utility — sourced by hook-utils.sh.
 # Resolves the log repo path from .archetype-manifest.json → repos/<name>.
-# Falls back to $PROJECT_DIR if log repo is inaccessible (robustness only).
-
+#
+# There is NO fallback to the root repo when the manifest declares a log repo.
+# Logs, progress reports, notes, handoffs and the wiki all live in the log repo;
+# root is not a degraded-mode destination for any of them, it is simply wrong.
+# A "robustness" fallback here is worse than an error: writes to root succeed,
+# nothing reports a problem, and the content drifts where nothing reads it.
+#
 # --- Resolve log repo path ---
-# Sets LOG_REPO_DIR (exported). Idempotent — skips if already set.
+# Sets LOG_REPO_DIR (exported) and returns 0 on success.
+# On failure: leaves LOG_REPO_DIR unset, sets LOG_REPO_MISSING to the expected
+# path, and returns 1. Idempotent — skips if already resolved.
 hook_resolve_log_repo() {
   # Already resolved this session
   if [[ -n "${LOG_REPO_DIR:-}" ]]; then return 0; fi
@@ -26,27 +33,41 @@ hook_resolve_log_repo() {
       if [[ -d "$repo_dir" ]]; then
         local resolved
         resolved="$(cd "$repo_dir" && pwd -P)"
-        LOG_REPO_DIR="$resolved"; export LOG_REPO_DIR; return 0
+        LOG_REPO_DIR="$resolved"; export LOG_REPO_DIR
+        unset LOG_REPO_MISSING
+        return 0
       fi
+      # Declared but absent. A broken setup, not single-repo mode.
+      LOG_REPO_MISSING="$project_dir/repos/$log_name"; export LOG_REPO_MISSING
+      unset LOG_REPO_DIR
+      return 1
     fi
   fi
 
-  # 3. Fallback: write to root repo (pre-init or broken path)
-  LOG_REPO_DIR="$project_dir"; export LOG_REPO_DIR; return 0
+  # 3. No log repo declared — genuine single-repo mode, root is correct.
+  LOG_REPO_DIR="$project_dir"; export LOG_REPO_DIR
+  unset LOG_REPO_MISSING
+  return 0
 }
 
 # --- Check if running in split mode ---
 # Returns 0 (true) if log repo is separate from root repo.
+# An unresolved log repo is not split mode — it is no mode at all.
 hook_is_split_mode() {
-  hook_resolve_log_repo
+  hook_resolve_log_repo || return 1
   [[ "$LOG_REPO_DIR" != "${PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}" ]]
 }
 
 # --- Create per-user log directories ---
 # Creates the standard directory tree in the log repo for a given user.
+# Returns 1 without creating anything when the log repo is unresolved. Callers
+# run under `set -e`, so invoke as `hook_ensure_log_dirs "$u" || true` where the
+# caller intends to carry on and report the problem itself. Creating this tree
+# somewhere else is never the right recovery: it is what makes a broken setup
+# look healthy.
 hook_ensure_log_dirs() {
   local user="${1:-${SESSION_USER:-unknown}}"
-  hook_resolve_log_repo
+  hook_resolve_log_repo || return 1
   mkdir -p "$LOG_REPO_DIR/logs/audit/$user" \
            "$LOG_REPO_DIR/logs/progress/$user" \
            "$LOG_REPO_DIR/logs/skills" \

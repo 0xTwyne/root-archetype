@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: End-of-session wrap-up — updates logs, progress report, handoffs, wiki, indexes; surveys every repo for unpushed work and open PRs; pushes to main
+description: End-of-session wrap-up — updates logs, progress report, handoffs, wiki, indexes; surveys every repo for unpushed work and open PRs; pushes to main. Use when the user runs /wrap-up, says "wrap up", or wants a mid-session checkpoint pushed. Do NOT use for an ordinary commit — use safe-commit for that.
 ---
 
 # Session Wrap-Up
@@ -13,17 +13,57 @@ Do not hardcode a username. Every path below is per-user, and writing into
 someone else's directory is the one mistake here that is hard to notice and
 annoying to unpick.
 
+**Each Bash tool call is a fresh shell — variables do not survive between them.**
+So this is not a one-time preamble: paste this block at the top of *every* Bash
+call below that uses `$USER_NAME`, `$LOG_REPO` or `$GH_OWNER`. Skipping it is
+silent, not loud: `$GH_OWNER` expands to the empty string and `gh search prs
+--owner ""` searches nothing rather than erroring in a way you would notice.
+
 ```bash
-USER_NAME=$(jq -r '.user' .session-identity 2>/dev/null)
-[ -z "$USER_NAME" ] || [ "$USER_NAME" = "null" ] && USER_NAME="${SESSION_USER:-$(gh api user --jq .login 2>/dev/null || git config user.name)}"
+USER_NAME=$(jq -r '.user // empty' .session-identity 2>/dev/null || true)
+if [ -z "$USER_NAME" ] || [ "$USER_NAME" = "null" ]; then
+  USER_NAME=$(gh api user --jq .login 2>/dev/null || git config user.name 2>/dev/null || true)
+  # session-start.sh sanitizes the same way; matching it keeps one person from
+  # ending up with two directories ("Ada Lovelace" -> AdaLovelace) depending on
+  # whether gh happened to be authenticated.
+  USER_NAME=$(printf '%s' "$USER_NAME" | tr -cd 'a-zA-Z0-9_-')
+fi
 
 LOG_REPO=$(jq -r '.log_repo_name' .archetype-manifest.json)      # -> repos/$LOG_REPO
 GH_OWNER=$(jq -r '.template_values.GH_USER' .archetype-manifest.json)
 ```
 
+Written as `if/then` deliberately. The earlier one-liner
+(`[ -z "$X" ] || [ "$X" = "null" ] && X=...`) returns **exit 1 on the happy
+path** — when the name is valid both tests fail and `&&` short-circuits — so a
+Bash call ending on that line reports failure while having worked correctly.
+
 `.session-identity` is written by `session-start.sh`, which resolves the user
 from `gh api user --jq .login` and falls back to git config. If `$USER_NAME`
 comes out empty or looks wrong, ask rather than guessing.
+
+### Then check the log repo is real, before writing anything
+
+```bash
+git -C "repos/$LOG_REPO" rev-parse --git-dir >/dev/null 2>&1 \
+  && echo "log repo OK" || echo "STOP: repos/$LOG_REPO is not a git repo"
+```
+
+If this fails, **stop and tell the user to run `bash scripts/bootstrap.sh`.** Do
+not proceed and do not improvise another location.
+
+Logs, progress reports, notes, handoffs and the wiki all live in the log repo.
+There is no second location and no degraded mode — the root repo is not a place
+any of them belong. `repos/$LOG_REPO/` is gitignored by root, so writing there
+without the clone present produces an ordinary untracked directory and no error
+at all.
+
+`push-logs.sh` now aborts in this situation rather than silently redirecting,
+and `session-start.sh` warns at the top of the session, so you should never
+reach this check in a broken state. It stays as the last line of defence
+because the failure it guards against is invisible: files get created, nothing
+errors, and the summary in step 7 would report Success over a session whose
+entire written record exists in no repository.
 
 ## Steps
 
@@ -75,18 +115,41 @@ Also glance at `repos/$LOG_REPO/wiki/STALENESS.md`. If this session
 touched a source that made an article stale, refreshing it now is cheaper than
 letting the drift accumulate.
 
-### 5. Unpushed-Work Survey
+### 5. Audit Log Verification
+
+Verify the session's audit log is consistent:
+- `SESSION_START` and `SESSION_END` are present
+- Every significant task has `TASK_START` and `TASK_END`
+- Modified files have `FILE_MODIFY` entries
+- Test runs (if any) have `TEST_RUN` entries with counts
+
+The audit log is at
+`repos/$LOG_REPO/logs/audit/$USER_NAME/tool-calls-YYYY-MM-DD-<session>.jsonl`,
+and the cross-session summary is `repos/$LOG_REPO/logs/agent_audit.log`.
+
+Both live in the log repo and nowhere else. If you find audit entries under the
+ROOT repo's `logs/`, something is resolving the log repo wrongly — that is a
+finding, not a duplicate to tidy away. This has happened: a writer that resolved
+to `<root>/logs` unconditionally kept appending there for months after the log
+repo was split out, accumulating entries that existed in the log repo nowhere at
+all. Nothing errored.
+
+### 6. Unpushed-Work Survey
 
 Survey every repo under `repos/` plus the root repo for unpushed work and open PRs.
 
 For each repo, report:
 
 ```bash
+# Fresh shell — re-derive. See "Resolve who and where, first".
+LOG_REPO=$(jq -r '.log_repo_name' .archetype-manifest.json)
+GH_OWNER=$(jq -r '.template_values.GH_USER' .archetype-manifest.json)
+
 # 1. Survey every git repo (root + repos/*)
 for repo in . repos/*/; do
   [ -d "$repo/.git" ] || continue
-  name=$([ "$repo" = "." ] && echo "governance-root" || basename "$repo")
-  [ "$name" = "$LOG_REPO" ] && continue   # handled by push-logs.sh in step 6
+  name=$([ "$repo" = "." ] && echo "sangha-root" || basename "$repo")
+  [ "$name" = "$LOG_REPO" ] && continue   # handled by push-logs.sh in step 8
 
   uncommitted=$(git -C "$repo" status --porcelain 2>/dev/null | head -10)
   ahead_current=$(git -C "$repo" log --oneline @{u}..HEAD 2>/dev/null | head -10)
@@ -138,7 +201,31 @@ Interpret the output and **explicitly classify each finding** before asking the 
 
 For each genuine finding, check `MAINTAINERS.json` to determine whether the current user is a maintainer of that repo. Then ask the user what to do.
 
-### 6. Commit and Push Knowledge
+### 7. Wiki Refresh (Drain Stale Backlog)
+
+This drains the *shared* staleness backlog — not a check of this session's own
+topics. Every session takes a turn refreshing a few articles so stale entries
+never accumulate team-wide.
+
+1. Read `repos/$LOG_REPO/wiki/STALENESS.md` (ordered stalest-first) and take the
+   **top 3 entries**, regardless of whether they relate to this session's work or
+   this user's articles.
+2. For each of the 3 articles:
+   - Read the article and the changed sources it lists as stale.
+   - Update the article to reflect the changed sources, and bump its `updated:`
+     frontmatter date.
+   - If a source change requires domain judgment this session does not have
+     (e.g. a domain call outside its expertise), skip that
+     article and record the skip — and why — in the progress report rather than
+     guessing.
+3. Run `bash scripts/build-indexes.sh` to regenerate `STALENESS.md` and
+   `INDEX.md` after the updates.
+4. Include the wiki changes in the push flow in the next step.
+
+If `STALENESS.md` reports every article fresh, say so and move on — an empty
+backlog is a normal state, not a step to force.
+
+### 8. Commit and Push Knowledge
 
 Stage and commit all documentation changes, then push to the knowledge repo:
 
@@ -152,7 +239,7 @@ This handles:
 - Regenerating the handoff index
 - Committing and pushing to the log repo's main branch
 
-### 7. Summary
+### 9. Summary
 
 End with a summary of what was updated:
 
@@ -164,6 +251,8 @@ End with a summary of what was updated:
 | Progress report | Created/Updated |
 | Handoffs | Updated/No active handoffs |
 | Wiki | N articles created/updated / No wiki-worthy content |
+| Wiki refresh (stale backlog) | N drained / backlog empty |
+| Audit log | Consistent / N gaps found |
 | Indexes | Rebuilt |
 | Unpushed work | repo-name: pushed/PR created/kept local / No findings |
 | Open PRs (authored by me) | N open / list per repo with CI state, or No open PRs |
@@ -173,7 +262,7 @@ End with a summary of what was updated:
 ## Guidelines
 
 - The running session's own audit file
-  (`logs/audit/<user>/tool-calls-<date>-<session>.jsonl`) is expected to be
+  (`repos/$LOG_REPO/logs/audit/$USER_NAME/tool-calls-<date>-<session>.jsonl`) is expected to be
   modified — the PostToolUse hook appends to it on every tool call, including
   the ones this wrap-up is making. It is a live log, not uncommitted work, and
   the session-end hook commits it. Do not report it as a finding; do report any
@@ -183,3 +272,27 @@ End with a summary of what was updated:
 - Note deferred work explicitly so the next session can pick it up
 - Keep progress entries self-contained — a reader shouldn't need other files to understand what happened
 - Wiki compilation is optional per session — only create/update articles for genuinely reusable knowledge
+
+## Gotchas
+
+- **Each Bash tool call is a fresh shell.** `$USER_NAME`, `$LOG_REPO` and
+  `$GH_OWNER` do not survive between calls. Re-derive them in every block that
+  uses them. The failure is silent: `gh search prs --owner ""` searches nothing
+  and reports no error.
+- **Never write to the root repo.** Logs, progress reports, notes, handoffs and
+  the wiki live in the log repo only. Root is not a fallback — a resolver that
+  treats it as one produces duplicate, drifting content that nothing reads.
+- **Check the log repo exists before writing anything.** `repos/<log-repo>/` is
+  gitignored by root, so writing there without the clone present creates an
+  untracked directory and raises no error at any stage.
+- **Do not report the running session's own audit file as a finding.** The
+  PostToolUse hook appends to it on every call, including this wrap-up's own.
+  A *different* audit file being dirty is a real finding — it means a finished
+  session never ended cleanly.
+- **`[ -z "$X" ] || [ "$X" = "null" ] && X=...` returns exit 1 on the happy
+  path.** Both tests fail when the value is valid, so `&&` short-circuits. A
+  Bash call ending on that line reports failure while having worked. Use
+  `if/then`.
+- **A count hides an open issue.** Step 5 lists issues rather than counting them
+  because a single open issue reads as noise until someone opens it. A
+  collaborator who files an issue instead of a handoff is easy to miss for weeks.

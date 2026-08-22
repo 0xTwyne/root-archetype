@@ -47,8 +47,10 @@ done
 
 ARCHETYPE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-[[ -d "${ARCHETYPE_DIR}/agents/engines/${ENGINE}" ]] || \
-    { echo "Error: Unknown engine '${ENGINE}'."; ls -1 "${ARCHETYPE_DIR}/agents/engines" | grep -v README; exit 1; }
+case "$ENGINE" in
+    claude|codex) ;;
+    *) echo "Error: Unknown engine '${ENGINE}'. Supported: claude, codex"; exit 1 ;;
+esac
 
 # --- Auto-detect user identity ---
 GH_USER=""; MAINTAINER_EMAIL=""
@@ -115,8 +117,14 @@ for f in AGENT.md README.md MAINTAINERS.json .devcontainer/devcontainer.json; do
     [[ -f "$f" ]] && substitute "$f"
 done
 
-# --- Generate engine adapter files ---
-bash scripts/utils/generate-engine.sh --engine "$ENGINE" --project-dir "$(pwd)"
+# --- Engine adapter files ---
+# Nothing to generate: .claude/ (skills, commands, settings), CLAUDE.md and
+# CODEX.md are tracked in git, so copying the archetype already delivered them.
+# Drop the engine doc the project will not use, so the tree matches its engine.
+case "$ENGINE" in
+    claude) rm -f CODEX.md ;;
+    codex)  rm -f CLAUDE.md ;;
+esac
 
 # --- Ensure directory structure ---
 # logs/ and notes/ are skeletal stubs in root — actual data lives in the log repo
@@ -259,7 +267,7 @@ fi
 
 # --- Post-init validation ---
 echo ""; WARN=0
-for check in agents:d agents/engines:d scripts/hooks:d AGENT.md:f MAINTAINERS.json:f; do
+for check in agents:d .claude/skills:d .claude/commands:d scripts/hooks:d AGENT.md:f MAINTAINERS.json:f; do
     path="${check%%:*}"; type="${check##*:}"
     [[ ("$type" == d && -d "$path") || ("$type" == f && -f "$path") ]] || { echo "  WARN: Missing $path"; WARN=1; }
 done

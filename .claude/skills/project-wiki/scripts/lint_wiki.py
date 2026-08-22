@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import re
+import json
 import sys
 import time
 from datetime import date, datetime
@@ -43,6 +44,68 @@ WARNING = "WARNING"
 INFO = "INFO"
 
 Issue = tuple[str, str, str]  # (severity, file, message)
+
+
+class _MultiDir:
+    """A read-only stand-in for Path that spans several directories.
+
+    Handoffs are per-user (notes/<user>/handoffs/active), so there is no single
+    directory to lint. Every pass here uses only .exists() and .glob(), so one
+    shim covers all of them without touching the passes themselves.
+    """
+
+    def __init__(self, dirs):
+        self._dirs = [d for d in dirs]
+
+    def exists(self) -> bool:
+        return any(d.exists() for d in self._dirs)
+
+    def glob(self, pattern):
+        for d in self._dirs:
+            if d.exists():
+                yield from d.glob(pattern)
+
+    def __truediv__(self, name):
+        """Resolve a child across the spanned dirs.
+
+        Returns the first directory where the child exists, so `.exists()` on
+        the result answers "does any user have this handoff?". Falls back to the
+        first directory so the result is always a real Path.
+        """
+        for d in self._dirs:
+            candidate = d / name
+            if candidate.exists():
+                return candidate
+        return (self._dirs[0] if self._dirs else ROOT) / name
+
+    def __str__(self) -> str:
+        return ", ".join(str(d) for d in self._dirs) or "(none)"
+
+
+def _log_repo_root() -> Path:
+    """Resolve the log repo the way the hooks do.
+
+    Handoffs, notes, progress reports and the wiki all live there. Defaulting to
+    the root repo — which this script did, via `ROOT / "handoffs/active"` — points
+    the linter at a directory that has never existed in this project.
+    """
+    manifest = ROOT / ".archetype-manifest.json"
+    if manifest.exists():
+        try:
+            name = json.loads(manifest.read_text()).get("log_repo_name", "")
+        except Exception:
+            name = ""
+        if name and (ROOT / "repos" / name).is_dir():
+            return ROOT / "repos" / name
+    return ROOT
+
+
+def _handoff_dirs(kind: str) -> _MultiDir:
+    """All per-user handoff directories of the given kind ("active"/"completed")."""
+    base = _log_repo_root() / "notes"
+    if not base.is_dir():
+        return _MultiDir([])
+    return _MultiDir(sorted(base.glob(f"*/handoffs/{kind}")))
 
 
 def load_wiki_config() -> dict:
@@ -83,6 +146,17 @@ def _extract_referenced_handoffs(active_dir: Path, extra_index_patterns: list[st
     patterns = extra_index_patterns or ["*-index.md"]
     referenced = set()
     seen_files: set[Path] = set()
+
+    # The generated aggregate index lives at <log-repo>/notes/handoffs/INDEX.md,
+    # NOT inside handoffs/active/, so globbing the active dir alone finds no index
+    # and reports every handoff as an orphan. That is a false positive about this
+    # project's layout, not a finding about the handoff.
+    aggregate = _log_repo_root() / "notes" / "handoffs" / "INDEX.md"
+    if aggregate.is_file():
+        for link in _extract_md_links(aggregate.read_text(errors="replace")):
+            referenced.add(Path(link).name)
+        seen_files.add(aggregate)
+
     for pattern in patterns:
         for index_file in active_dir.glob(pattern):
             if index_file in seen_files:
@@ -166,6 +240,10 @@ def check_unactioned_intake(index_path: Path, max_age_days: int) -> list[Issue]:
     """Pass 4: Find intake entries that should have handoffs but don't."""
     issues: list[Issue] = []
     if not index_path.exists():
+        # Report rather than return silently: a missing index means this pass did
+        # not run, which is materially different from "ran and found nothing".
+        issues.append((WARNING, str(index_path),
+                       "Intake index not found — un-actioned-intake pass did not run"))
         return issues
 
     with open(index_path) as f:
@@ -235,14 +313,30 @@ def main() -> int:
 
     # Configurable paths with defaults
     paths_cfg = lint_cfg.get("paths", {})
-    active_dir = ROOT / paths_cfg.get("active_handoffs", "handoffs/active")
-    completed_dir = ROOT / paths_cfg.get("completed_handoffs", "handoffs/completed")
-    index_path = ROOT / paths_cfg.get("intake_index", "research/intake_index.yaml")
+    if "active_handoffs" in paths_cfg:
+        active_dir = ROOT / paths_cfg["active_handoffs"]
+    else:
+        active_dir = _handoff_dirs("active")
+    if "completed_handoffs" in paths_cfg:
+        completed_dir = ROOT / paths_cfg["completed_handoffs"]
+    else:
+        completed_dir = _handoff_dirs("completed")
+    # The intake index is one of the few knowledge artifacts that stays in the
+    # ROOT repo: knowledge/research/ did not move at the April 2026 split, only
+    # knowledge/wiki/ did. The default was "research/intake_index.yaml" relative
+    # to root, which resolved to a path that has never existed — and pass 4
+    # returns silently when the file is absent, so the un-actioned-intake check
+    # reported zero issues for its entire life rather than reporting that it
+    # could not run.
+    index_path = ROOT / paths_cfg.get("intake_index", "knowledge/research/intake_index.yaml")
     index_patterns = lint_cfg.get("index_patterns", ["*-index.md"])
 
+    # No active handoffs is a normal state, not a failure. Treating the empty
+    # case as an error is the same day-one trap catalogued in
+    # wiki/tooling/bash-strict-mode-traps.md.
     if not active_dir.exists():
-        print(f"ERROR: Active handoffs directory not found at {active_dir}")
-        return 1
+        print("Wiki lint: no active handoffs to check — nothing to report.")
+        return 0
 
     all_issues: list[Issue] = []
     pass_names = []

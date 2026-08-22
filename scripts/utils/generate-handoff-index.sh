@@ -9,7 +9,20 @@ set -euo pipefail
 # ROOT_DIR defaults to git toplevel. Pass a worktree path when called
 # from push-logs.sh.
 
-ROOT_DIR="${1:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+# ROOT_DIR defaults to the LOG REPO, not the root repo. Handoffs and their index
+# live there. Defaulting to git toplevel meant a bare invocation scanned the root
+# repo, found no per-user handoff directories, and wrote an empty INDEX.md into
+# the root repo's notes/ — which is a documentation stub. push-logs.sh always
+# passes an explicit path, so only a direct call hit it.
+_repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+_default_dir="$_repo_root"
+if [[ -f "$_repo_root/.archetype-manifest.json" ]] && command -v jq >/dev/null 2>&1; then
+  _log_name="$(jq -r '.log_repo_name // empty' "$_repo_root/.archetype-manifest.json" 2>/dev/null || echo "")"
+  if [[ -n "$_log_name" && -d "$_repo_root/repos/$_log_name" ]]; then
+    _default_dir="$_repo_root/repos/$_log_name"
+  fi
+fi
+ROOT_DIR="${1:-$_default_dir}"
 NOTES_DIR="$ROOT_DIR/notes"
 INDEX_FILE="$NOTES_DIR/handoffs/INDEX.md"
 

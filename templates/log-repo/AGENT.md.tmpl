@@ -1,0 +1,105 @@
+# {{LOG_REPO_NAME}} — Agent Instructions
+
+## Purpose
+
+The **log repo** for the {{PROJECT_NAME}} governance workspace. Every session
+log, progress report, note, handoff and wiki article lives here. Nothing of that
+kind belongs anywhere else — in particular not in the root repo, whose `logs/`
+and `notes/` are documentation stubs holding only a `README.md`.
+
+Freely writable by design: no branch protections, so anyone with access pushes
+without PR friction. That makes the rules below the only thing keeping it tidy.
+
+## Repository Map
+
+| Path | Purpose |
+|------|---------|
+| `logs/progress/<user>/YYYY-MM-DD.md` | Daily progress reports, appended to |
+| `logs/audit/<user>/` | Per-session tool-call audit trails |
+| `logs/agent_audit.log` | Append-only cross-session JSONL summary |
+| `logs/skills/` | Skill invocation logs |
+| `notes/<user>/facts.md` | Cross-session facts cache, loaded every session |
+| `notes/<user>/plans/` | Session plans |
+| `notes/<user>/handoffs/{active,completed}/` | Work tracking documents |
+| `wiki/` | The compiled cross-user wiki — **it lives here, not in the root repo** |
+| `wiki/schema.md` | Frontmatter spec every article must satisfy |
+| `identities.json` | Alias registry — maps every identity a person presents to one directory |
+| `scripts/build-indexes.sh` | The real index builder; root's script is a thin wrapper |
+
+## Rules for writing and pushing
+
+These are not style preferences. Each one exists because breaking it fails
+quietly rather than loudly.
+
+1. **Append, never overwrite.** A day's progress report accumulates one
+   `## Wrap-up: HH:MM UTC` section per session. Overwriting costs someone else
+   their day's record, and nothing warns you.
+
+2. **Write only to your own `<user>/` directory.** Resolve the username from
+   `gh api user --jq .login`, sanitized to `[a-zA-Z0-9_-]` — never hardcode one
+   and never copy someone else's. Writing into another person's directory
+   succeeds, pushes, and shows no symptom except their directory slowly filling
+   with your sessions.
+
+3. **Never write to the root repo's `logs/` or `notes/`.** They are stubs. If a
+   tool writes there, it is resolving the log repo wrongly — report it as a bug
+   rather than tidying the duplicate away. A resolver that silently falls back to
+   root produces months of content that nothing reads.
+
+4. **Confirm this repo exists before writing anything.**
+   `git -C repos/{{LOG_REPO_NAME}} rev-parse --git-dir` — the root repo
+   gitignores that path, so writing to it while the clone is missing creates an
+   ordinary untracked directory and raises no error at any stage.
+
+5. **Register your aliases before your first write.**
+   `bash scripts/utils/register-identity.sh` — it records every identity this
+   machine can present (gh login, git user.name raw and sanitised, git email,
+   `$USER`) against one canonical directory name, and reports any directory
+   already created under an alias so you can merge it with `--apply`.
+
+   This is not bookkeeping. The user resolver falls back from `gh api user` to
+   `git config user.name` to `$USER`, so the same person becomes `dmrobotix` on
+   a machine with gh authenticated and `MargotPaez` on one without. Both
+   directories look legitimate, neither errors, and the split is only noticed
+   when someone goes looking for history that appears to be missing.
+
+6. **Never hand-edit generated files.** `scripts/build-indexes.sh` owns
+   `logs/progress/INDEX.md`, `notes/INDEX.md`, `wiki/INDEX.md` and
+   `wiki/STALENESS.md`; `generate-handoff-index.sh` in the root repo owns
+   `notes/handoffs/INDEX.md`. An edit survives only until the next build.
+
+7. **Wiki articles need YAML frontmatter** per `wiki/schema.md`, and `sources:`
+   must list real, repo-relative paths. Staleness detection compares each
+   source's last git commit against the article's `updated:` date, so an article
+   with no real sources is never flagged stale and quietly rots. Extending a
+   `sources:` list is how you make the check able to see a change.
+
+8. **Push through the tooling, not by hand.** `bash scripts/utils/push-logs.sh`
+   in the root repo commits and pushes this repo, regenerates the handoff index,
+   and aborts rather than redirecting if this repo is missing. The `/wrap-up`
+   skill wraps that with the rest of the end-of-session flow. Both resolve the
+   user and check this repo exists first.
+
+9. **No secrets, ever.** This repo is append-only and freely writable, so a
+   committed credential is both permanent in history and visible to everyone
+   with access. Progress reports quote command output — redact before pasting.
+
+## Gotchas
+
+- **The running session's own audit file is expected to be dirty** — the
+  PostToolUse hook appends to it on every call. A *different* audit file being
+  dirty is a real finding: a finished session never ended cleanly.
+- **An empty directory is a normal state, not a failure.** Several tools here
+  have broken on the day-one path — no users yet, no handoffs yet, no articles
+  yet. Treat "found nothing" and "could not run" as different outcomes and print
+  them differently.
+- `scripts/build-indexes.sh` runs under `set -euo pipefail`, where a command's
+  ordinary "found nothing" return is fatal, and where a command that exits 0 with
+  empty output defeats an `||` fallback. Check values, not just exit status.
+
+## Parent Repo
+
+Governed by **{{PROJECT_NAME}}**, which clones this repo to
+`repos/{{LOG_REPO_NAME}}/`. See the root's `AGENT.md` for cross-repo context,
+governance and hooks. The root's location is machine-specific — do not hardcode
+an absolute path to it.

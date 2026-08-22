@@ -15,8 +15,8 @@ Umbrella repository for cross-repo coordination and governance. No application c
 
 - `agents/shared/` — Cross-cutting policy inherited by all roles (operating constraints, engineering standards, workflows)
 - `agents/roles/` — Role-specific overlays (6-section schema: Mission, Use This Role When, Inputs Required, Outputs, Workflow, Guardrails)
-- `agents/skills/` — Reusable methodology and skill definitions (see `agents/skills/DISCOVERY.md`)
-- `.claude/commands/` — Engine-specific slash commands (generated at init from `agents/engines/`)
+- `.claude/skills/` — Skills, tracked in git (see `.claude/skills/DISCOVERY.md`)
+- `.claude/commands/` — Slash commands, tracked in git
 
 ## Governance
 

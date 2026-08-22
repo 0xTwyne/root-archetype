@@ -17,7 +17,6 @@ REQUIRED_DIRS = [
     "agents",
     "agents/shared",
     "agents/roles",
-    "agents/engines",
     "scripts/hooks",
     "scripts/validate",
     "scripts/session",
@@ -25,7 +24,7 @@ REQUIRED_DIRS = [
     "notes",
 ]
 
-# Engine-conditional directories (generated at init)
+# Engine-conditional directories (tracked in git, not generated)
 ENGINE_DIRS = {
     "claude": [".claude/commands", ".claude/skills"],
 }

@@ -47,6 +47,16 @@ if [[ -f "$ROOT_DIR/scripts/hooks/lib/hook-utils.sh" ]]; then
     hook_resolve_log_repo 2>/dev/null || true
 fi
 
+# A log repo that is declared but absent is fatal, not a reason to fall back.
+# The legacy path below syncs the ROOT repo's logs/ and notes/ — which, when the
+# log repo is simply missing, means the session's records were written to
+# repos/<log-repo>/ (gitignored by root, invisible here), this script finds
+# nothing to copy, prints a cheerful "nothing to push" and exits 0. That is how
+# a whole session's record goes missing without a single error.
+if [[ -n "${LOG_REPO_MISSING:-}" ]]; then
+    fail "log repo not found at $LOG_REPO_MISSING — nothing pushed. Run: bash scripts/bootstrap.sh"
+fi
+
 # Load session ID for commit messages
 SESSION_ID=""
 if [[ -f "$ROOT_DIR/.session-identity" ]]; then
