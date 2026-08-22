@@ -25,6 +25,24 @@ local/*
 !local/.gitkeep
 !local/README.md
 
+# Shared scratch (directory tracked, contents ignored).
+#
+# Throwaway session working space: experiment output, intermediate data, a
+# scratch clone of a child repo. Tracked as an empty skeleton so it is present
+# on every clone -- an ignored path that does not exist is not a place anyone
+# puts anything, and the observed failure mode is scratch work landing in a
+# sibling directory OUTSIDE the root clone, where no other session can read it
+# and the wrap-up survey (which walks only `.` and `repos/*/`) cannot report it
+# as unpushed.
+#
+# Being ignored is also what keeps tmp/ out of the session-end sweep:
+# `git add -A` does not stage ignored paths, so nothing here can be collected
+# into a session PR.
+#
+# Nothing in tmp/ is backed up or survives a clean checkout.
+tmp/*
+!tmp/.gitkeep
+
 # Knowledge research compile cache
 knowledge/research/.last_compile
 
