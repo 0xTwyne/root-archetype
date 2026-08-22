@@ -138,15 +138,73 @@ echo '{"tool_calls":0,"subagents":0,"file_modifications":0}' > "$PROJECT_DIR/.se
 # --- Pull latest main before branching ---
 CURRENT_BRANCH="$(git -C "$PROJECT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")"
 PULL_STATUS=""
+# Whether origin was actually reached. Without this, an offline session cannot
+# tell "up to date" from "never asked": rev-list against a week-old origin/main
+# returns 0 and reads as an all-clear.
+REMOTE_OK=0
 if [[ "$CURRENT_BRANCH" == "main" ]]; then
   if GIT_TERMINAL_PROMPT=0 git -C "$PROJECT_DIR" pull --ff-only origin main 2>/dev/null; then
     PULL_STATUS="main updated"
+    REMOTE_OK=1
   else
     PULL_STATUS="pull failed (may have local changes)"
+    # --ff-only refuses on any local commit or divergence, and may refuse before
+    # updating the remote ref. Fetch anyway so the behind-count below compares
+    # against something current — otherwise the one case that most needs the
+    # warning is the case that cannot produce it.
+    if GIT_TERMINAL_PROMPT=0 git -C "$PROJECT_DIR" fetch origin main 2>/dev/null; then
+      REMOTE_OK=1
+    fi
   fi
 else
-  GIT_TERMINAL_PROMPT=0 git -C "$PROJECT_DIR" fetch origin main 2>/dev/null || true
-  PULL_STATUS="fetched origin/main"
+  if GIT_TERMINAL_PROMPT=0 git -C "$PROJECT_DIR" fetch origin main 2>/dev/null; then
+    PULL_STATUS="fetched origin/main"
+    REMOTE_OK=1
+  else
+    PULL_STATUS="could not reach origin"
+  fi
+fi
+
+# --- Is this clone behind main? ---
+#
+# .claude/ is tracked, so `git pull` is the ONLY delivery mechanism for skills,
+# commands, hooks and settings.json. A collaborator whose clone is behind is not
+# merely reading stale docs — they are running without hooks that exist on main,
+# and nothing used to say so. PULL_STATUS was computed here and never read: the
+# string "pull failed (may have local changes)" was assigned and discarded, so
+# the failure that strands someone was the one thing guaranteed to be silent.
+#
+# Three cases this must cover, all previously invisible:
+#   1. on main, --ff-only refused (local commits or divergence)
+#   2. on a session branch, where nothing pulls at all — only a fetch
+#   3. a new session branch cut from an already-stale branch, which compounds
+#      session over session because checkout -b branches from CURRENT_BRANCH
+STALE_WARNING=""
+if [[ "$REMOTE_OK" -eq 1 ]]; then
+  # `|| echo 0` matters under `set -e`: rev-list exits non-zero when origin/main
+  # is missing (a clone that has never fetched), which would abort the session.
+  BEHIND="$(git -C "$PROJECT_DIR" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)"
+  if [[ "$BEHIND" =~ ^[0-9]+$ ]] && [[ "$BEHIND" -gt 0 ]]; then
+    # Name the paths that change how a session behaves. "3 commits behind" is
+    # ignorable; "3 commits behind, including .claude/settings.json" is not.
+    AGENT_FILES="$(git -C "$PROJECT_DIR" diff --name-only "HEAD...origin/main" -- \
+        .claude/ scripts/hooks/ agents/ CLAUDE.md AGENT.md 2>/dev/null | head -6 || true)"
+    STALE_WARNING="\nLOCAL CLONE IS ${BEHIND} COMMIT(S) BEHIND origin/main.\n"
+    if [[ -n "$AGENT_FILES" ]]; then
+      STALE_WARNING+="Includes agent files — this session is running WITHOUT them:\n"
+      while IFS= read -r _f; do
+        [[ -n "$_f" ]] && STALE_WARNING+="  $_f\n"
+      done <<< "$AGENT_FILES"
+    fi
+    if [[ "$CURRENT_BRANCH" == "main" ]]; then
+      STALE_WARNING+="Fix: git pull --ff-only origin main   (it refused — check for local commits)\n"
+    else
+      STALE_WARNING+="You were on '${CURRENT_BRANCH}', so this session branched from a stale base.\n"
+      STALE_WARNING+="Fix: git checkout main && git pull --ff-only, then start a new session.\n"
+    fi
+  fi
+elif [[ "$CURRENT_BRANCH" != "unknown" ]]; then
+  STALE_WARNING="\nCould not reach origin — clone freshness is UNKNOWN, not confirmed.\n"
 fi
 
 # Create session branch.
@@ -173,6 +231,9 @@ fi
 # --- Build context output ---
 CONTEXT="Session branch: $BRANCH_NAME\nUser: $SESSION_USER\nAudit logging: active (logs/audit/$SESSION_USER/)\n"
 CONTEXT+="${BRANCH_WARNING}"
+# Silent when the clone is current and origin was reached — the common case
+# should cost nothing. Only speaks when there is something to act on.
+CONTEXT+="${STALE_WARNING}"
 
 # Unregistered-and-ambiguous identity warning. Silent when the person is
 # registered, or when nothing about their setup could resolve differently.
