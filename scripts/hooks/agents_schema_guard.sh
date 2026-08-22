@@ -5,6 +5,14 @@ set -euo pipefail
 # Trigger: PreToolUse → Write|Edit
 # Purpose: Enforce 6-section schema in agents/*.md files
 
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
+
 REQUIRED_SECTIONS=(
     "## Mission"
     "## Use This Role When"

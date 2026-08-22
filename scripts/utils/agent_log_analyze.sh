@@ -4,6 +4,14 @@ set -euo pipefail
 # Agent audit log analyzer
 # Usage: ./agent_log_analyze.sh [--summary|--errors|--sessions|--timeline N|--loops]
 
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
+
 LOG_DIR="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")/logs"
 LOG_FILE="${LOG_DIR}/agent_audit.log"
 

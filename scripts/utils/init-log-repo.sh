@@ -69,17 +69,70 @@ for _c in "${WIKI_CATEGORIES[@]}"; do
 done
 
 ARCHETYPE_DIR="${ARCHETYPE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
-if [[ -d "$ARCHETYPE_DIR/templates/log-repo" ]]; then
-    mkdir -p "$LOG_REPO_PATH/scripts"
-    cp "$ARCHETYPE_DIR/templates/log-repo/scripts/build-indexes.sh" "$LOG_REPO_PATH/scripts/" 2>/dev/null || true
-    cp "$ARCHETYPE_DIR/templates/log-repo/wiki/schema.md"           "$LOG_REPO_PATH/wiki/"    2>/dev/null || true
-    cp "$ARCHETYPE_DIR/templates/log-repo/wiki/README.md"           "$LOG_REPO_PATH/wiki/"    2>/dev/null || true
-    cp "$ARCHETYPE_DIR/templates/log-repo/notes/facts.md.tmpl"      "$LOG_REPO_PATH/notes/"   2>/dev/null || true
-    chmod +x "$LOG_REPO_PATH/scripts/build-indexes.sh" 2>/dev/null || true
+TEMPLATE_DIR="$ARCHETYPE_DIR/templates/log-repo"
 
-    # Generate INDEX.md and STALENESS.md now, so they exist from the first
-    # commit and nobody mistakes their absence for a broken build.
-    ( cd "$LOG_REPO_PATH" && bash scripts/build-indexes.sh >/dev/null 2>&1 ) || true
+# Every copy below is REQUIRED, and each is checked. These used to be
+# `cp ... 2>/dev/null || true`, which meant a missing or unreadable template
+# produced a log repo silently lacking its index builder, its frontmatter spec,
+# or its agent instructions — discovered much later, if at all.
+if [[ ! -d "$TEMPLATE_DIR" ]]; then
+    echo "ERROR: template directory not found at $TEMPLATE_DIR" >&2
+    echo "  The log repo would be created without its builder, schema or AGENT.md." >&2
+    exit 1
+fi
+
+mkdir -p "$LOG_REPO_PATH/scripts"
+copy_required() {
+    local src="$1" dst="$2"
+    if [[ ! -f "$src" ]]; then
+        echo "ERROR: required template missing: $src" >&2
+        return 1
+    fi
+    cp "$src" "$dst" || { echo "ERROR: could not copy $src -> $dst" >&2; return 1; }
+}
+COPY_FAILED=0
+copy_required "$TEMPLATE_DIR/scripts/build-indexes.sh" "$LOG_REPO_PATH/scripts/build-indexes.sh" || COPY_FAILED=1
+copy_required "$TEMPLATE_DIR/wiki/schema.md"           "$LOG_REPO_PATH/wiki/schema.md"           || COPY_FAILED=1
+copy_required "$TEMPLATE_DIR/wiki/README.md"           "$LOG_REPO_PATH/wiki/README.md"           || COPY_FAILED=1
+[[ "$COPY_FAILED" -eq 0 ]] || { echo "ERROR: log repo is incomplete — aborting rather than shipping a broken one." >&2; exit 1; }
+
+# AGENT.md — the rules for writing to and pushing this repo. A log repo without
+# it is one an agent has no repo-local instructions for, which is how conventions
+# like append-only and user isolation get broken by someone acting in good faith.
+if [[ -f "$TEMPLATE_DIR/AGENT.md.tmpl" ]]; then
+    sed -e "s|{{LOG_REPO_NAME}}|${LOG_REPO_NAME}|g" \
+        -e "s|{{PROJECT_NAME}}|${PROJECT_NAME}|g" \
+        "$TEMPLATE_DIR/AGENT.md.tmpl" > "$LOG_REPO_PATH/AGENT.md" \
+        || { echo "ERROR: could not write AGENT.md" >&2; exit 1; }
+else
+    echo "ERROR: required template missing: $TEMPLATE_DIR/AGENT.md.tmpl" >&2
+    exit 1
+fi
+
+# identities.json — the alias registry. Ships empty; each person registers on
+# their first session. Without it, one human resolves to a different directory
+# depending on whether gh happened to be authenticated, and their history splits.
+if [[ -f "$TEMPLATE_DIR/identities.json.tmpl" ]]; then
+    sed -e "s|{{LOG_REPO_NAME}}|${LOG_REPO_NAME}|g" \
+        -e "s|{{PROJECT_NAME}}|${PROJECT_NAME}|g" \
+        "$TEMPLATE_DIR/identities.json.tmpl" > "$LOG_REPO_PATH/identities.json" \
+        || { echo "ERROR: could not write identities.json" >&2; exit 1; }
+else
+    echo "ERROR: required template missing: $TEMPLATE_DIR/identities.json.tmpl" >&2
+    exit 1
+fi
+
+# facts.md is per-user and created on first session by the session-start hook.
+# The template is kept for reference rather than copied in as a stray .tmpl file.
+
+chmod +x "$LOG_REPO_PATH/scripts/build-indexes.sh"
+
+# Generate INDEX.md and STALENESS.md now, so they exist from the first commit
+# and nobody mistakes their absence for a broken build. Report failure — a
+# builder that cannot run on an empty repo is a day-one bug worth knowing about.
+if ! ( cd "$LOG_REPO_PATH" && bash scripts/build-indexes.sh >/dev/null 2>&1 ); then
+    echo "WARNING: build-indexes.sh failed on the freshly created log repo." >&2
+    echo "  This usually means it does not handle the empty/day-one case." >&2
 fi
 
 # --- Write .gitignore ---

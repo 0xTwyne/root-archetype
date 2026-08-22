@@ -150,7 +150,12 @@ build_notes_index() {
     [[ -z "$TITLE" ]] && TITLE="${BASENAME%.md}"
     if [[ "${#TITLE}" -gt 100 ]]; then TITLE="${TITLE:0:97}..."; fi
 
-    MOD_DATE="$(git -C "$KNOWLEDGE_ROOT" log -1 --format=%cs -- "$FILE" 2>/dev/null || date -r "$FILE" +%Y-%m-%d 2>/dev/null || echo "unknown")"
+    # `git log -1` on an UNTRACKED file exits 0 with EMPTY output, so a bare
+    # `||` fallback never fires and MOD_DATE ends up empty. An empty field then
+    # shifts every later column of the generated table left. Test the value.
+    MOD_DATE="$(git -C "$KNOWLEDGE_ROOT" log -1 --format=%cs -- "$FILE" 2>/dev/null || true)"
+    [[ -z "$MOD_DATE" ]] && MOD_DATE="$(date -r "$FILE" +%Y-%m-%d 2>/dev/null || true)"
+    [[ -z "$MOD_DATE" ]] && MOD_DATE="unknown"
 
     printf '%s\t%s\t%s\t%s\t%s\n' "$USER" "$CATEGORY" "$MOD_DATE" "$REL_PATH" "$TITLE" >> "$TMPFILE"
   done < <(find "$NOTES_DIR" -name '*.md' -print0 | sort -z)
@@ -162,7 +167,10 @@ build_notes_index() {
     [[ "$BASENAME" == "INDEX.md" ]] && continue
     TITLE="$(grep -m1 '^# ' "$FILE" 2>/dev/null | sed 's/^# //' || true)"
     [[ -z "$TITLE" ]] && TITLE="${BASENAME%.md}"
-    MOD_DATE="$(git -C "$KNOWLEDGE_ROOT" log -1 --format=%cs -- "$FILE" 2>/dev/null || echo "unknown")"
+    # Same untracked-file trap: exit 0 with empty output defeats `||`.
+    MOD_DATE="$(git -C "$KNOWLEDGE_ROOT" log -1 --format=%cs -- "$FILE" 2>/dev/null || true)"
+    [[ -z "$MOD_DATE" ]] && MOD_DATE="$(date -r "$FILE" +%Y-%m-%d 2>/dev/null || true)"
+    [[ -z "$MOD_DATE" ]] && MOD_DATE="unknown"
     printf '%s\t%s\t%s\t%s\t%s\n' "_shared" "root" "$MOD_DATE" "$BASENAME" "$TITLE" >> "$TMPFILE"
   done
 

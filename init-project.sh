@@ -7,6 +7,14 @@ set -euo pipefail
 # Default: in-place init (CWD is the cloned archetype, transforms in place)
 # Legacy:  --copy-to <path>  copies archetype to a new directory
 
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
+
 usage() {
     cat <<'USAGE'
 Usage: init-project.sh <project-name> [options]
@@ -47,8 +55,10 @@ done
 
 ARCHETYPE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-[[ -d "${ARCHETYPE_DIR}/agents/engines/${ENGINE}" ]] || \
-    { echo "Error: Unknown engine '${ENGINE}'."; ls -1 "${ARCHETYPE_DIR}/agents/engines" | grep -v README; exit 1; }
+case "$ENGINE" in
+    claude|codex) ;;
+    *) echo "Error: Unknown engine '${ENGINE}'. Supported: claude, codex"; exit 1 ;;
+esac
 
 # --- Auto-detect user identity ---
 GH_USER=""; MAINTAINER_EMAIL=""
@@ -115,8 +125,14 @@ for f in AGENT.md README.md MAINTAINERS.json .devcontainer/devcontainer.json; do
     [[ -f "$f" ]] && substitute "$f"
 done
 
-# --- Generate engine adapter files ---
-bash scripts/utils/generate-engine.sh --engine "$ENGINE" --project-dir "$(pwd)"
+# --- Engine adapter files ---
+# Nothing to generate: .claude/ (skills, commands, settings), CLAUDE.md and
+# CODEX.md are tracked in git, so copying the archetype already delivered them.
+# Drop the engine doc the project will not use, so the tree matches its engine.
+case "$ENGINE" in
+    claude) rm -f CODEX.md ;;
+    codex)  rm -f CLAUDE.md ;;
+esac
 
 # --- Ensure directory structure ---
 # logs/ and notes/ are skeletal stubs in root — actual data lives in the log repo
@@ -259,15 +275,44 @@ fi
 
 # --- Post-init validation ---
 echo ""; WARN=0
-for check in agents:d agents/engines:d scripts/hooks:d AGENT.md:f MAINTAINERS.json:f; do
+for check in agents:d .claude/skills:d .claude/commands:d scripts/hooks:d AGENT.md:f MAINTAINERS.json:f; do
     path="${check%%:*}"; type="${check##*:}"
     [[ ("$type" == d && -d "$path") || ("$type" == f && -f "$path") ]] || { echo "  WARN: Missing $path"; WARN=1; }
 done
-# Validate log repo
-if [[ -d "$LOG_REPO_PATH/.git" ]]; then
-    echo "  Log repo: OK (repos/${LOG_REPO_NAME}/)"
-else
+# Validate log repo.
+#
+# `-d .git` alone is not enough: init-log-repo.sh runs `git init` before it seeds
+# anything, so a run that failed partway still leaves a directory that passes
+# that test. This step therefore reported "Log repo: OK" and "Validation passed"
+# in the same breath as "WARNING: Log repo creation failed". Check for the
+# artifacts a usable log repo must actually have.
+if [[ ! -d "$LOG_REPO_PATH/.git" ]]; then
     echo "  WARN: Log repo not found at ${LOG_REPO_PATH}"; WARN=1
+else
+    LOG_MISSING=""
+    for _needed in \
+        AGENT.md \
+        README.md \
+        identities.json \
+        wiki/schema.md \
+        scripts/build-indexes.sh; do
+        [[ -f "$LOG_REPO_PATH/$_needed" ]] || LOG_MISSING+=" $_needed"
+    done
+    for _needed_dir in logs/progress logs/audit notes wiki; do
+        [[ -d "$LOG_REPO_PATH/$_needed_dir" ]] || LOG_MISSING+=" $_needed_dir/"
+    done
+    # An initial commit matters on its own: without one, `gh repo create --push`
+    # fails confusingly later, and the repo cannot be cloned by a collaborator.
+    if ! git -C "$LOG_REPO_PATH" rev-parse HEAD >/dev/null 2>&1; then
+        LOG_MISSING+=" (no initial commit)"
+    fi
+
+    if [[ -z "$LOG_MISSING" ]]; then
+        echo "  Log repo: OK (repos/${LOG_REPO_NAME}/)"
+    else
+        echo "  WARN: Log repo at ${LOG_REPO_PATH} is incomplete —${LOG_MISSING}"
+        WARN=1
+    fi
 fi
 [[ "$ENGINE" == claude ]] && for f in CLAUDE.md .claude/settings.json; do
     [[ -f "$f" ]] || { echo "  WARN: Missing $f"; WARN=1; }

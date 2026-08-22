@@ -22,6 +22,28 @@ INVENTORY_SECTIONS = [
 ]
 
 
+def _gitignored(refs: list) -> set:
+    """Return the subset of refs that git ignores.
+
+    A documented path that git ignores is absent from a fresh clone by design,
+    so it can never be a broken reference. Requiring it makes this validator
+    pass on a configured machine and fail on a clone.
+    """
+    import subprocess
+    if not refs:
+        return set()
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "check-ignore", "--stdin"],
+            input="\n".join(refs), capture_output=True, text=True, timeout=15,
+        )
+    except Exception:
+        return set()
+    if proc.returncode not in (0, 1):
+        return set()
+    return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
+
+
 def extract_backtick_refs(text: str) -> list[str]:
     """Extract backtick-quoted paths from text."""
     return re.findall(r'`([^`]+(?:\.(?:sh|py|json|yaml|yml|md)|/))`', text)
@@ -41,7 +63,8 @@ _SECTION_DIRS = {
 
 def check_referenced_paths(content: str) -> list[str]:
     """Check that backtick-quoted paths exist on disk."""
-    errors = []
+    errors: list[str] = []
+    missing: list[str] = []
 
     # Build set of basenames that appear under known section headings
     section_basenames: set[str] = set()
@@ -78,7 +101,15 @@ def check_referenced_paths(content: str) -> list[str]:
             continue
         path = REPO_ROOT / ref
         if not path.exists():
-            errors.append(f"Referenced path does not exist: `{ref}`")
+            missing.append(ref)
+
+    # Drop anything git ignores — absent from a clone by design, not broken.
+    ignored = _gitignored(sorted(set(missing)))
+    errors.extend(
+        f"Referenced path does not exist: `{ref}`"
+        for ref in missing
+        if ref not in ignored
+    )
     return errors
 
 

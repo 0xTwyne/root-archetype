@@ -193,6 +193,15 @@ hook_tools_audit() {
 
 # --- Source log repo resolution utility ---
 _HOOK_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+# CR-safe jq for every hook that sources this file. See the file for why.
+if [[ -f "$_HOOK_LIB_DIR/../../lib/cr-safe-jq.sh" ]]; then
+  source "$_HOOK_LIB_DIR/../../lib/cr-safe-jq.sh"
+fi
 if [[ -f "$_HOOK_LIB_DIR/log-repo.sh" ]]; then
   source "$_HOOK_LIB_DIR/log-repo.sh"
+fi
+# identity.sh depends on hook_resolve_log_repo, so it must come after log-repo.sh
+if [[ -f "$_HOOK_LIB_DIR/identity.sh" ]]; then
+  source "$_HOOK_LIB_DIR/identity.sh"
 fi

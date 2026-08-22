@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Alias registry for {{LOG_REPO_NAME}}. Maps every identity a person can present",
+    "to the ONE directory name their logs, notes and handoffs live under.",
+    "",
+    "Why this exists: session-start resolves the user from `gh api user --jq .login`,",
+    "falling back to `git config user.name`, then $USER, then 'unknown' — sanitized to",
+    "[a-zA-Z0-9_-]. The same person therefore gets a different directory depending on",
+    "which fallback fired: a GitHub login on one machine, a sanitized display name",
+    "('Ada Lovelace' -> AdaLovelace) on another, a shell username on a third. Nothing",
+    "errors; their history just splits across directories nobody thinks to merge.",
+    "",
+    "Add yourself on your first session. Aliases are matched case-insensitively",
+    "against the gh login, git user.name (raw and sanitized), git user.email and",
+    "$USER. `canonical` should be the GitHub login — it is the one identity that is",
+    "stable across machines and is what repo permissions are granted to.",
+    "",
+    "Register with: bash scripts/utils/register-identity.sh --canonical <gh-login>",
+    "which also finds and merges directories already created under an alias."
+  ],
+  "users": []
+}

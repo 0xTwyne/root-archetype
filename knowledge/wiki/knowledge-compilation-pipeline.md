@@ -24,8 +24,8 @@ Optional log repo (`--log-repo` at init) physically separates logs/notes into `r
 
 ## See Also
 
-- [`agents/skills/project-wiki/SKILL.md`](../../agents/skills/project-wiki/SKILL.md) — full compile workflow
-- [`agents/skills/research-intake/SKILL.md`](../../agents/skills/research-intake/SKILL.md) — structured research ingestion
+- [`.claude/skills/project-wiki/SKILL.md`](../../.claude/skills/project-wiki/SKILL.md) — full compile workflow
+- [`.claude/skills/research-intake/SKILL.md`](../../.claude/skills/research-intake/SKILL.md) — structured research ingestion
 - [`scripts/utils/generate-handoff-index.sh`](../../scripts/utils/generate-handoff-index.sh) — mechanical index generator
-- [`agents/skills/project-wiki/scripts/compile_sources.py`](../../agents/skills/project-wiki/scripts/compile_sources.py) — manifest scanner
+- [`.claude/skills/project-wiki/scripts/compile_sources.py`](../../.claude/skills/project-wiki/scripts/compile_sources.py) — manifest scanner
 - [`taxonomy.yaml`](../../knowledge/taxonomy.yaml) — categories and confidence levels for compiled pages

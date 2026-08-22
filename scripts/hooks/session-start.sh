@@ -100,6 +100,15 @@ fi
 
 # Sanitize to [a-zA-Z0-9_-]
 SESSION_USER="$(echo "$SESSION_USER" | tr -cd 'a-zA-Z0-9_-')"
+
+# Canonicalise through the log repo's alias registry, so one person maps to ONE
+# directory regardless of which fallback above produced the name. Without this,
+# the same human is "dmrobotix" where gh is authenticated and "MargotPaez" where
+# only git config is — and their history silently splits in two.
+if declare -F hook_canonical_user >/dev/null 2>&1; then
+  _CANON="$(hook_canonical_user "$SESSION_USER" 2>/dev/null || echo "")"
+  [[ -n "$_CANON" ]] && SESSION_USER="$_CANON"
+fi
 [[ -z "$SESSION_USER" ]] && SESSION_USER="unknown"
 
 # Resolve project name from manifest or directory basename
@@ -118,7 +127,10 @@ jq -cn \
   > "$PROJECT_DIR/.session-identity"
 
 # --- Create per-user directories (in log repo) ---
-hook_ensure_log_dirs "$SESSION_USER"
+# `|| true` because an absent log repo must not abort the session — the point of
+# the run is to reach the "CHILD REPO(S) NOT CLONED" warning below and say so.
+# It creates nothing when unresolved, by design.
+hook_ensure_log_dirs "$SESSION_USER" || true
 
 # Initialize session stats tracker (gitignored)
 echo '{"tool_calls":0,"subagents":0,"file_modifications":0}' > "$PROJECT_DIR/.session-stats"
@@ -162,6 +174,13 @@ fi
 CONTEXT="Session branch: $BRANCH_NAME\nUser: $SESSION_USER\nAudit logging: active (logs/audit/$SESSION_USER/)\n"
 CONTEXT+="${BRANCH_WARNING}"
 
+# Unregistered-and-ambiguous identity warning. Silent when the person is
+# registered, or when nothing about their setup could resolve differently.
+if declare -F hook_identity_warning >/dev/null 2>&1; then
+  _IDW="$(hook_identity_warning "$SESSION_USER" 2>/dev/null || echo "")"
+  [[ -n "$_IDW" ]] && CONTEXT+="\n${_IDW}\n"
+fi
+
 # Agent registry summary
 if [[ -f "$PROJECT_DIR/agents/registry.json" ]]; then
   AGENT_COUNT="$(jq 'length // (.agents | length) // 0' "$PROJECT_DIR/agents/registry.json" 2>/dev/null || echo "0")"
@@ -177,32 +196,38 @@ if [[ -f "$FACTS_FILE" ]] && [[ -s "$FACTS_FILE" ]]; then
 fi
 
 
-# --- Un-bootstrapped clone detection ---
-# .claude/settings.json is tracked, so this hook runs even in a fresh clone —
-# but the rest of the engine adapters (CLAUDE.md, .claude/skills/,
-# .claude/commands/) are generated and gitignored, so they are missing until
-# someone bootstraps. Regenerate them here: it is local, fast and idempotent.
-# Child repos are NOT cloned here — that needs the network and credentials, and
-# would risk blowing this hook's timeout — so point the operator at bootstrap.
-if [[ ! -f "$PROJECT_DIR/CLAUDE.md" ]] || [[ ! -d "$PROJECT_DIR/.claude/skills" ]]; then
-  if bash "$PROJECT_DIR/scripts/utils/generate-engine.sh" --engine claude \
-          --project-dir "$PROJECT_DIR" >/dev/null 2>&1; then
-    CONTEXT+="\nFRESH CLONE DETECTED — engine adapters were missing and have been regenerated.\n"
-  else
-    CONTEXT+="\nFRESH CLONE DETECTED — engine adapters are missing and could not be regenerated.\n"
-  fi
-  MISSING_REPOS=0
-  if [[ -f "$PROJECT_DIR/repos/repos.json" ]] && command -v jq &>/dev/null; then
+# No engine-adapter regeneration happens here any more.
+#
+# .claude/ is tracked in git — skills, commands and settings are ordinary files
+# that `git clone` and `git pull` deliver. There is nothing to generate, nothing
+# to drift, and no reason to ask anyone to restart a session for a new skill.
+#
+# What used to be here: a check that regenerated .claude/skills/ only when the
+# directory was MISSING ENTIRELY. Anyone who had set the project up once kept
+# that directory forever, so the check passed on every later session and their
+# skill set froze. A skill added to git reached nobody. The fix is not a better
+# check — it is not having a generated layer.
+
+# --- Missing child repo detection ---
+# Checked unconditionally, not only on a fresh clone. repos/<log-repo>/ is
+# gitignored by the root repo, so when it is absent a write to
+# repos/<log-repo>/logs/... lands in an ordinary untracked directory: the write
+# succeeds, push-logs.sh finds nothing to push, and the session's record exists
+# in no repository at all. This warning is the only thing between that and
+# silent loss. Child repos are NOT cloned here — that needs network and
+# credentials and would risk this hook's timeout.
+MISSING_REPOS=""
+if [[ -f "$PROJECT_DIR/repos/repos.json" ]] && command -v jq &>/dev/null; then
     while IFS= read -r _repo_name; do
-      [[ -n "$_repo_name" ]] || continue
-      [[ -d "$PROJECT_DIR/repos/$_repo_name/.git" ]] || MISSING_REPOS=$((MISSING_REPOS + 1))
+        [[ -n "$_repo_name" ]] || continue
+        [[ -d "$PROJECT_DIR/repos/$_repo_name/.git" ]] || MISSING_REPOS+=" $_repo_name"
     done < <(jq -r '.repos[]? | select(.clone_url != null and .clone_url != "") | .name' \
                 "$PROJECT_DIR/repos/repos.json" 2>/dev/null || true)
-  fi
-  if [[ "$MISSING_REPOS" -gt 0 ]]; then
-    CONTEXT+="${MISSING_REPOS} child repo(s) under repos/ are not cloned. Run: bash scripts/bootstrap.sh\n"
-  fi
-  CONTEXT+="Restart the session afterwards so the regenerated skills and commands load.\n"
+fi
+if [[ -n "$MISSING_REPOS" ]]; then
+    CONTEXT+="\nCHILD REPO(S) NOT CLONED:${MISSING_REPOS}\n"
+    CONTEXT+="Anything written under repos/<name>/ will be saved to an untracked directory and pushed nowhere.\n"
+    CONTEXT+="Do not run /wrap-up until this is fixed. Run: bash scripts/bootstrap.sh\n"
 fi
 
 # --- Guided init detection ---

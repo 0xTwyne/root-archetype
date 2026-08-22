@@ -5,7 +5,9 @@ description: Create a structured handoff document for cross-session or cross-age
 
 # New Handoff
 
-Create a properly structured handoff document in `notes/<user>/handoffs/`.
+Create a properly structured handoff document in the **knowledge repo's** `notes/<user>/handoffs/`.
+
+Resolve the knowledge repo path: `jq -r '.log_repo_name' .archetype-manifest.json | tr -d '\r'` → `repos/<name>/`. The `tr` is not optional — the Windows jq writes stdout in text mode, and the bare CR it appends survives `$( )` and names no directory.
 
 ## What to do
 
@@ -13,28 +15,25 @@ Create a properly structured handoff document in `notes/<user>/handoffs/`.
 
 2. Generate a kebab-case filename from the title (e.g. "Auth Middleware Rewrite" → `auth-middleware-rewrite.md`).
 
-3. **Resolve the log repo path**: read `.archetype-manifest.json` for `log_repo_name`, then look in `repos/<name>/`. All handoffs live in the log repo.
-
-4. Check for duplicate filenames in the log repo:
+3. Check for duplicate filenames in the knowledge repo:
    ```bash
-   find <log-repo>/notes/ -path "*/handoffs/*.md" 2>/dev/null | grep -i "<filename>"
+   LOG_REPO="repos/$(jq -r .log_repo_name .archetype-manifest.json | tr -d '\r')"
+   find "$LOG_REPO/notes/" -path "*/handoffs/*.md" 2>/dev/null | grep -i "<filename>"
    ```
 
-5. Create the handoff using the template in `assets/handoff-template.md`. Fill in:
+4. Create the handoff using the template in `assets/handoff-template.md`. Fill in:
    - **Status**: `active`
    - **Created**: today's date
-   - **Source Repo**: from `.session-identity` `root_repo` field
-   - **Source Branch**: current git branch
    - **Context**: from user input
    - Leave Remediation Plan and Acceptance Criteria as skeleton sections for the user to fill.
 
-6. Place in `<log-repo>/notes/<user>/handoffs/<filename>.md`.
+5. Place in `<knowledge-repo>/notes/<user>/handoffs/<filename>.md`.
 
 ## Handoff lifecycle
 
-- `notes/<user>/handoffs/` — Active/in-progress work
-- `notes/<user>/handoffs/completed/` — Done (move manually)
-- `notes/handoffs/INDEX.md` — Aggregation index across users
+- `<knowledge-repo>/notes/<user>/handoffs/` — Active/in-progress work
+- `<knowledge-repo>/notes/<user>/handoffs/completed/` — Done (move manually)
+- `<knowledge-repo>/notes/handoffs/INDEX.md` — Aggregation index across users
 
 ## Gotchas
 

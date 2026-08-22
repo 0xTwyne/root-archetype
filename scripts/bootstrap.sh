@@ -12,11 +12,19 @@ set -euo pipefail
 # This script restores all of it. Run it once after cloning; safe to re-run.
 #
 # Note: regeneration overwrites the engine doc and .claude/settings.json from
-# the templates in agents/engines/. Put local customisation in
+# tracked files. Put local customisation in
 # .claude/settings.local.json, which is never touched.
 #
 # Usage:
 #   bash scripts/bootstrap.sh [--engine claude|codex] [--skip-clone]
+
+
+# CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
+_CRSAFE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
+  _CRSAFE="$(dirname "$_CRSAFE")"
+done
+[[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -62,8 +70,11 @@ echo "Engine: $ENGINE"
 echo ""
 
 # --- 1. Engine adapter files ---
+# Nothing to do: .claude/ (skills, commands, settings) and the engine doc are
+# tracked in git, so cloning delivers them. This step used to generate
+# .claude/skills/ from an agents/skills tree; that layer is gone with its drift.
 echo "--- 1/4 Engine adapters ---"
-bash "$ROOT_DIR/scripts/utils/generate-engine.sh" --engine "$ENGINE" --project-dir "$ROOT_DIR"
+echo "  Tracked in git — nothing to generate."
 echo ""
 
 # --- 2. Child repo clones ---
@@ -188,6 +199,46 @@ check_nonempty_dir() {
 }
 
 check_path "agent instructions" "AGENT.md"
+
+# --- Child repos ---
+# Verified here rather than trusted from step 2, because step 2 can legitimately
+# be skipped (--skip-clone) and a directory can exist without being a clone.
+# Before this check, `bootstrap.sh --skip-clone` printed "Bootstrap complete" and
+# exited 0 on a tree with no child repos at all.
+if [[ -f "$REPOS_MANIFEST" ]] && command -v jq >/dev/null 2>&1; then
+    while IFS= read -r _name; do
+        [[ -n "$_name" ]] || continue
+        if [[ -d "$ROOT_DIR/repos/$_name/.git" ]]; then
+            echo "  ok    child repo repos/$_name"
+        else
+            echo "  MISS  child repo repos/$_name is not a git clone"
+            warn "repos/$_name is not cloned — re-run without --skip-clone, or check access"
+        fi
+    done < <(jq -r '.repos[]? | select(.clone_url != null and .clone_url != "") | .name' \
+                "$REPOS_MANIFEST" 2>/dev/null || true)
+fi
+
+# --- Log repo ---
+# Singled out because it is the one every session writes to, and because its
+# absence fails silently: hooks that resolve it dynamically may fall back, while
+# skills resolve it statically to repos/<log-repo>/ — which the root repo
+# gitignores. Session records then land in a directory no repo tracks.
+LOG_REPO_NAME="$(manifest_value '.log_repo_name' '')"
+if [[ -n "$LOG_REPO_NAME" ]]; then
+    if [[ -d "$ROOT_DIR/repos/$LOG_REPO_NAME/.git" ]]; then
+        echo "  ok    log repo repos/$LOG_REPO_NAME"
+    else
+        echo "  MISS  log repo repos/$LOG_REPO_NAME"
+        warn "The log repo repos/$LOG_REPO_NAME is missing. Every session writes there; without it /wrap-up saves to an untracked directory and pushes nothing. This is not optional."
+    fi
+    if [[ -f "$REPOS_MANIFEST" ]] && command -v jq >/dev/null 2>&1; then
+        if ! jq -e --arg n "$LOG_REPO_NAME" \
+                '.repos[]? | select(.name == $n and .clone_url != null and .clone_url != "")' \
+                "$REPOS_MANIFEST" >/dev/null 2>&1; then
+            warn "repos/repos.json has no cloneable entry for the log repo '$LOG_REPO_NAME' — bootstrap cannot obtain it."
+        fi
+    fi
+fi
 
 case "$ENGINE" in
     claude)
