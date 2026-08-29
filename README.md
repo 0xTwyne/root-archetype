@@ -33,8 +33,8 @@ git clone <archetype-url> my-project && cd my-project
 # Copy mode (scaffold into a different directory)
 ./init-project.sh my-project --copy-to /path/to/target
 
-# Custom log repo location (default: repos/<name>-logs/)
-./init-project.sh my-project --log-repo /path/to/custom-logs
+# Custom knowledge repo location (default: repos/<name>-knowledge/)
+./init-project.sh my-project --knowledge-repo /path/to/custom-knowledge
 
 # Register more repos later
 scripts/repos/register-repo.sh my-lib /path/to/my-lib --purpose "shared library"
@@ -49,29 +49,33 @@ hook selection, knowledge seeding, and role customization interactively.
 
 ```
 ├── AGENT.md               # Engine-neutral agent instructions (primary)
-├── CLAUDE.md              # Claude Code engine wiring (generated, gitignored)
-├── CODEX.md               # OpenAI Codex engine wiring (generated, gitignored)
+├── CLAUDE.md              # Claude Code engine wiring (tracked)
+├── CODEX.md               # OpenAI Codex engine wiring (tracked)
 ├── MAINTAINERS.json       # Who can modify protected files
+├── .claude/               # TRACKED: settings.json, skills/, commands/
 ├── agents/
 │   ├── shared/            # Cross-cutting policy (constraints, standards, workflows)
 │   ├── roles/             # Role overlays (6-section schema per role)
-│   └── skills/            # Engine-neutral skill definitions + catalog
+│   └── prompt-templates/  # Optional prompt snippets copied to local/ at init
 ├── scripts/
-│   ├── hooks/             # All hooks (5 default, 8 optional) + lib/
+│   ├── bootstrap.sh       # One-shot setup for a fresh clone (run this first)
+│   ├── hooks/             # All hooks (6 wired by default, 16 total) + lib/ + tests/
 │   ├── validate/          # Governance validators
 │   ├── session/           # Session lifecycle
 │   ├── repos/             # Child repo management
 │   └── utils/             # Logging, analysis, generation
-├── knowledge/
-│   ├── wiki/              # Master wiki (maintainer-curated)
-│   └── research/          # Master research intake (promoted from member intake)
-├── logs/                  # Stub — actual data in log repo
-├── notes/                 # Stub — actual data in log repo
+├── docs/                  # Guides and design notes
+├── templates/             # Seed files copied into new knowledge repos
+├── knowledge/             # Archetype-internal KB — never copied into spawned
+│                          #   projects except taxonomy.yaml (see init-project.sh)
+├── logs/                  # Stub — actual data in the knowledge repo
+├── notes/                 # Stub — actual data in the knowledge repo
 ├── repos/
-│   ├── <project>-logs/    # Log repo (logs, notes, handoffs, per-member wikis + research)
+│   ├── <project>-knowledge/  # Knowledge repo (logs, notes, handoffs, compiled wiki)
 │   └── <child-repo>/      # Registered application repos (symlink or physical)
 ├── secrets/               # Protected paths (contents gitignored)
-└── local/                 # Per-machine customization (gitignored)
+├── local/                 # Per-machine customization (gitignored)
+└── tmp/                   # Shared scratch — contents gitignored
 ```
 
 > **Note**: `CLAUDE.md`, `CODEX.md` and `.claude/` (settings, skills, commands)
@@ -79,13 +83,14 @@ hook selection, knowledge seeding, and role customization interactively.
 > nothing is generated, and adding a skill later reaches collaborators through a
 > plain `git pull`. Only `.claude/settings.local.json` stays machine-local.
 
-## Log Repo
+## Knowledge Repo
 
-Every initialized project gets a dedicated **log repo** at `repos/<project>-logs/`.
-This is a separate git repository with no branch protections, so all team members
-can push session logs freely — even when the root repo has required reviews or CI gates.
+Every initialized project gets a dedicated **knowledge repo** at
+`repos/<project>-knowledge/`. This is a separate git repository with no branch
+protections, so all team members can push session logs freely — even when the
+root repo has required reviews or CI gates.
 
-The log repo contains:
+The knowledge repo contains:
 
 | Directory | Contents |
 |-----------|----------|
@@ -95,14 +100,14 @@ The log repo contains:
 | `notes/<user>/handoffs/` | Work tracking documents (active/completed) |
 | `notes/<user>/research/` | Per-member research intake (promoted to master by maintainers) |
 | `notes/<user>/facts.md` | Cross-session facts cache |
-| `wiki/<user>/` | Per-member wiki compilations |
+| `wiki/` | The compiled wiki, shared by all users (INDEX.md, STALENESS.md generated) |
 
-The log repo is registered as a child repo and discovered via
+The knowledge repo is registered as a child repo and discovered via
 `.archetype-manifest.json` → `log_repo_name` → `repos/<name>`.
 
 ## Hooks
 
-Hooks enforce policy during agent sessions. Five are wired by default in
+Hooks enforce policy during agent sessions. Six are wired by default in
 `.claude/settings.json`:
 
 | Hook | Trigger | Purpose |
@@ -112,8 +117,9 @@ Hooks enforce policy during agent sessions. Five are wired by default in
 | `check_secrets_read.sh` | PreToolUse (Read) | Block reads of protected paths |
 | `check_filesystem_path.sh` | PreToolUse (Write) | Prevent writes outside project |
 | `post-tool-use-audit.sh` | PostToolUse | Append-only audit trail |
+| `check_clone_destination.sh` | PreToolUse (Bash) | Block clones/worktrees landing outside the project |
 
-Eight more ship in `scripts/hooks/` but are not wired by default (edit guard,
+Ten more ship in `scripts/hooks/` but are not wired by default (edit guard,
 schema enforcement, correction detection, etc.). Enable them via
 `.claude/settings.json` or the init wizard. See `scripts/hooks/README.md`.
 
@@ -170,49 +176,43 @@ wrapper. Catalog: `.claude/skills/DISCOVERY.md`.
 
 ## Knowledge Management
 
-Knowledge flows through a two-tier pipeline. All team members produce into the
-log repo — notes, progress, research intake. Maintainers curate and promote
-into the root repo's master wiki and research database.
+Everyone produces into the knowledge repo — notes, progress reports, research
+intake — and the compile step distils those per-user streams into the shared
+wiki **in the same repo**. Nothing is compiled into the root repo: the wiki is
+data, and data lives where every team member can push.
 
 ```
- Log Repo (any team member)             Root Repo (maintainer-curated)
-┌─────────────────────────────┐       ┌──────────────────────┐
-│ notes/<user>/handoffs/      │       │                      │
-│ notes/<user>/plans/         │──┐    │                      │
-│ notes/<user>/research/      │  │    │                      │
-│ logs/progress/<user>/       │  │    │                      │
-└─────────────────────────────┘  │    │                      │
-                                 v    │                      │
-              ┌──────────────────────┐│                      │
-              │ /project-wiki compile││                      │
-              │ --user <username>    ││                      │
-              └──────────┬───────────┘│                      │
-                         v            │                      │
-┌─────────────────────────────┐       │                      │
-│ wiki/<user>/                │──┐    │                      │
-│ (per-member wiki)           │  │    │                      │
-└─────────────────────────────┘  │    │                      │
-                                 v    │                      │
-              ┌──────────────────────┐│  knowledge/wiki/     │
-              │ /project-wiki compile│├─>(master wiki)       │
-              │ --master             ││                      │
-              │ (maintainer only,    ││  knowledge/research/ │
-              │  auto when member    │├─>(master research)   │
-              │  compiles own wiki)  ││                      │
-              └──────────────────────┘└──────────────────────┘
+ repos/<project>-knowledge/ (any team member)
+┌─────────────────────────────┐
+│ notes/<user>/handoffs/      │
+│ notes/<user>/plans/         │──┐
+│ notes/<user>/research/      │  │
+│ logs/progress/<user>/       │  │
+└─────────────────────────────┘  │
+                                 v
+              ┌───────────────────────┐
+              │ /project-wiki compile │
+              └──────────┬────────────┘
+                         v
+┌─────────────────────────────┐
+│ wiki/                       │  compiled articles + INDEX.md + STALENESS.md
+│ (same repo, shared by all)  │  categories from knowledge/taxonomy.yaml (root)
+└─────────────────────────────┘
 ```
 
-- **Write to**: `<log-repo>/notes/<your-username>/`, `<log-repo>/logs/progress/<your-username>/`
-- **Research intake**: `/research-intake` → `<log-repo>/notes/<username>/research/`
-- **Per-member wiki**: `/project-wiki compile --user <name>` → `<log-repo>/wiki/<name>/`
-- **Master wiki + research**: `/project-wiki compile --master` → `knowledge/wiki/` + `knowledge/research/` (maintainer, auto-triggered)
+- **Write to**: `<knowledge-repo>/notes/<your-username>/`, `<knowledge-repo>/logs/progress/<your-username>/`
+- **Research intake**: `/research-intake` → `<knowledge-repo>/notes/<username>/research/`
+- **Compile**: `/project-wiki compile` → `<knowledge-repo>/wiki/` (never the root repo)
 
 ## Wiki — How to Use, Modify, and Personalize Root-Archetype
 
-[`knowledge/wiki/`](knowledge/wiki/) is the project's compiled reference
-documentation for anyone cloning root-archetype to build a new root repo.
-Each page indexes the source-of-truth files in this repo (`scripts/`,
-`.claude/skills/`, `docs/guides/`) and links external references where useful.
+[`knowledge/wiki/`](knowledge/wiki/) is reference documentation about
+root-archetype itself, for anyone cloning it to build a new root repo. It is
+**archetype-internal**: `init-project.sh` excludes it (and everything else under
+`knowledge/` except `taxonomy.yaml`) from spawned projects, so this directory is
+also a safe home for progress and handoffs on archetype development. Each page
+indexes the source-of-truth files in this repo (`scripts/`, `.claude/skills/`,
+`docs/guides/`) and links external references where useful.
 
 | Page | Topic |
 |------|-------|

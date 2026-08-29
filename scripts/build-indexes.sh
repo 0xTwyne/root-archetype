@@ -21,10 +21,17 @@ done
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
-LOG_REPO="knowledge"
-if [[ -f "$PROJECT_DIR/.archetype-manifest.json" ]] && command -v jq &>/dev/null; then
-  LOG_REPO="$(jq -r '.log_repo_name // "knowledge"' \
-    "$PROJECT_DIR/.archetype-manifest.json" 2>/dev/null || echo "knowledge")"
+# The name comes from the manifest or nowhere. Guessing ("knowledge") was a
+# third naming convention alongside "-logs" and "-knowledge", and a wrong guess
+# silently indexes nothing.
+if [[ ! -f "$PROJECT_DIR/.archetype-manifest.json" ]]; then
+  echo "build-indexes: no .archetype-manifest.json at $PROJECT_DIR — cannot resolve the knowledge repo" >&2
+  exit 1
+fi
+LOG_REPO="$(jq -r '.log_repo_name // empty' "$PROJECT_DIR/.archetype-manifest.json" 2>/dev/null | tr -d '\r' || echo "")"
+if [[ -z "$LOG_REPO" ]]; then
+  echo "build-indexes: manifest has no log_repo_name — cannot resolve the knowledge repo" >&2
+  exit 1
 fi
 
 KNOWLEDGE_ROOT="$PROJECT_DIR/repos/$LOG_REPO"
