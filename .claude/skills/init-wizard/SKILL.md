@@ -19,7 +19,7 @@ Guided project initialization wizard for new archetype instances.
 - Write to `.archetype-manifest.json` → `template_values.description`
 - Regenerate README if `scripts/utils/generate-readme.sh` is available
 
-### Step 1.5: Log repo setup
+### Step 1.5: Knowledge repo setup
 
 - Show: "Knowledge repo will be created at `repos/<project-name>-knowledge/` (default). Enter a custom path or press Enter to accept."
 - Accept custom path or confirm default — always display the default explicitly

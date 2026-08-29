@@ -8,7 +8,7 @@ child repos that contain it.
 ## How It Works
 
 1. **Clone this archetype** and run `init-project.sh` to scaffold a new governance root
-2. **A log repo is created automatically** inside `repos/` for session logs, notes, and handoffs
+2. **A knowledge repo is created automatically** inside `repos/` for session logs, notes, and handoffs
 3. **Register child repos** — your actual application code — under this root
 4. **AI agents read `AGENT.md`** (engine-neutral) for operating instructions, then
    engine-specific pointers (`CLAUDE.md`, `CODEX.md`) wire hooks and skills
@@ -52,7 +52,11 @@ hook selection, knowledge seeding, and role customization interactively.
 ├── CLAUDE.md              # Claude Code engine wiring (tracked)
 ├── CODEX.md               # OpenAI Codex engine wiring (tracked)
 ├── MAINTAINERS.json       # Who can modify protected files
+├── HOOKS.lock             # sha256 lock over scripts/hooks/ + scripts/validate/
+├── init-project.sh        # Scaffolds a new governance root from this archetype
 ├── .claude/               # TRACKED: settings.json, skills/, commands/
+├── .github/               # CI workflow: server-side protected-path backstop
+├── .devcontainer/         # Reproducible dev container definition
 ├── agents/
 │   ├── shared/            # Cross-cutting policy (constraints, standards, workflows)
 │   ├── roles/             # Role overlays (6-section schema per role)
@@ -113,7 +117,7 @@ Hooks enforce policy during agent sessions. Six are wired by default in
 | Hook | Trigger | Purpose |
 |------|---------|---------|
 | `session-start.sh` | SessionStart | Resolve user, branch, load context |
-| `session-end.sh` | SessionEnd | Write progress, push to log repo |
+| `session-end.sh` | SessionEnd | Write progress, push to knowledge repo |
 | `check_secrets_read.sh` | PreToolUse (Read) | Block reads of protected paths |
 | `check_filesystem_path.sh` | PreToolUse (Write) | Prevent writes outside project |
 | `post-tool-use-audit.sh` | PostToolUse | Append-only audit trail |

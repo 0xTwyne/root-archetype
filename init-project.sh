@@ -157,7 +157,7 @@ esac
 mkdir -p logs notes local repos secrets 2>/dev/null || true
 touch local/.gitkeep repos/.gitkeep secrets/.gitkeep 2>/dev/null || true
 
-# --- Create log repo ---
+# --- Create knowledge repo ---
 # Both live deployments (sangha-root, twyne-root) converged on
 # repos/<project>-knowledge — by hand, post-init, because this script forced
 # "-logs". The default now matches them. With a custom path, the NAME follows
@@ -166,26 +166,26 @@ touch local/.gitkeep repos/.gitkeep secrets/.gitkeep 2>/dev/null || true
 LOG_REPO_PATH="${LOG_REPO_OVERRIDE:-$(pwd)/repos/${PROJECT_NAME}-knowledge}"
 LOG_REPO_NAME="$(basename "$LOG_REPO_PATH")"
 echo ""
-echo "Creating log repo: ${LOG_REPO_NAME}"
+echo "Creating knowledge repo: ${LOG_REPO_NAME}"
 echo "  Path: ${LOG_REPO_PATH} $([[ -z "$LOG_REPO_OVERRIDE" ]] && echo "(default)" || echo "(custom)")"
 
 GITHUB_FLAG=""
 [[ -n "$GH_USER" ]] && command -v gh &>/dev/null && GITHUB_FLAG="--github"
 bash scripts/utils/init-log-repo.sh "$LOG_REPO_PATH" "$PROJECT_NAME" $GITHUB_FLAG 2>/dev/null || {
-    echo "WARNING: Log repo creation failed at ${LOG_REPO_PATH}"
+    echo "WARNING: Knowledge repo creation failed at ${LOG_REPO_PATH}"
 }
 
-# Register log repo as a child repo (no agent scaffolding — infrastructure repo)
+# Register knowledge repo as a child repo (no agent scaffolding — infrastructure repo)
 if [[ -d "$LOG_REPO_PATH" ]]; then
     bash scripts/repos/register-repo.sh "$LOG_REPO_NAME" "$LOG_REPO_PATH" \
         --purpose "Session logs, notes, handoffs, per-member wikis" \
         --no-scaffold 2>/dev/null || true
 fi
 
-# Add log repo directory to .gitignore (prevent parent from tracking nested repo content)
+# Add knowledge repo directory to .gitignore (prevent parent from tracking nested repo content)
 if ! grep -qF "repos/${LOG_REPO_NAME}/" .gitignore 2>/dev/null; then
     echo "" >> .gitignore
-    echo "# Log repo (nested git repo — content tracked separately)" >> .gitignore
+    echo "# Knowledge repo (nested git repo — content tracked separately)" >> .gitignore
     echo "repos/${LOG_REPO_NAME}/" >> .gitignore
 fi
 
@@ -193,9 +193,9 @@ fi
 cat > logs/README.md << 'STUBEOF'
 # Logs
 
-Session logs, audit trails, and progress reports live in the **log repo**.
+Session logs, audit trails, and progress reports live in the **knowledge repo**.
 
-The log repo is registered as a child repo in `repos/`. To find the path:
+The knowledge repo is registered as a child repo in `repos/`. To find the path:
 
 ```bash
 jq -r '.log_repo_name' .archetype-manifest.json
@@ -208,9 +208,9 @@ STUBEOF
 cat > notes/README.md << 'STUBEOF'
 # Notes
 
-Per-user notes, handoffs, plans, and facts live in the **log repo**.
+Per-user notes, handoffs, plans, and facts live in the **knowledge repo**.
 
-The log repo is registered as a child repo in `repos/`. To find the path:
+The knowledge repo is registered as a child repo in `repos/`. To find the path:
 
 ```bash
 jq -r '.log_repo_name' .archetype-manifest.json
@@ -299,15 +299,15 @@ for check in agents:d .claude/skills:d .claude/commands:d scripts/hooks:d AGENT.
     path="${check%%:*}"; type="${check##*:}"
     [[ ("$type" == d && -d "$path") || ("$type" == f && -f "$path") ]] || { echo "  WARN: Missing $path"; WARN=1; }
 done
-# Validate log repo.
+# Validate knowledge repo.
 #
 # `-d .git` alone is not enough: init-log-repo.sh runs `git init` before it seeds
 # anything, so a run that failed partway still leaves a directory that passes
-# that test. This step therefore reported "Log repo: OK" and "Validation passed"
-# in the same breath as "WARNING: Log repo creation failed". Check for the
-# artifacts a usable log repo must actually have.
+# that test. This step therefore reported "Knowledge repo: OK" and "Validation passed"
+# in the same breath as "WARNING: Knowledge repo creation failed". Check for the
+# artifacts a usable knowledge repo must actually have.
 if [[ ! -d "$LOG_REPO_PATH/.git" ]]; then
-    echo "  WARN: Log repo not found at ${LOG_REPO_PATH}"; WARN=1
+    echo "  WARN: Knowledge repo not found at ${LOG_REPO_PATH}"; WARN=1
 else
     LOG_MISSING=""
     for _needed in \
@@ -328,9 +328,9 @@ else
     fi
 
     if [[ -z "$LOG_MISSING" ]]; then
-        echo "  Log repo: OK (repos/${LOG_REPO_NAME}/)"
+        echo "  Knowledge repo: OK (repos/${LOG_REPO_NAME}/)"
     else
-        echo "  WARN: Log repo at ${LOG_REPO_PATH} is incomplete —${LOG_MISSING}"
+        echo "  WARN: Knowledge repo at ${LOG_REPO_PATH} is incomplete —${LOG_MISSING}"
         WARN=1
     fi
 fi
@@ -342,4 +342,4 @@ done
 echo ""
 echo "=== Initialized: ${PROJECT_NAME} (engine: ${ENGINE}) ==="
 echo "  Root repo: ${PROJECT_ROOT}"
-echo "  Log repo:  ${LOG_REPO_PATH}"
+echo "  Knowledge repo: ${LOG_REPO_PATH}"

@@ -218,24 +218,24 @@ if [[ -f "$REPOS_MANIFEST" ]] && command -v jq >/dev/null 2>&1; then
                 "$REPOS_MANIFEST" 2>/dev/null || true)
 fi
 
-# --- Log repo ---
+# --- Knowledge repo ---
 # Singled out because it is the one every session writes to, and because its
 # absence fails silently: hooks that resolve it dynamically may fall back, while
-# skills resolve it statically to repos/<log-repo>/ — which the root repo
+# skills resolve it statically to repos/<knowledge-repo>/ — which the root repo
 # gitignores. Session records then land in a directory no repo tracks.
 LOG_REPO_NAME="$(manifest_value '.log_repo_name' '')"
 if [[ -n "$LOG_REPO_NAME" ]]; then
     if [[ -d "$ROOT_DIR/repos/$LOG_REPO_NAME/.git" ]]; then
-        echo "  ok    log repo repos/$LOG_REPO_NAME"
+        echo "  ok    knowledge repo repos/$LOG_REPO_NAME"
     else
-        echo "  MISS  log repo repos/$LOG_REPO_NAME"
-        warn "The log repo repos/$LOG_REPO_NAME is missing. Every session writes there; without it /wrap-up saves to an untracked directory and pushes nothing. This is not optional."
+        echo "  MISS  knowledge repo repos/$LOG_REPO_NAME"
+        warn "The knowledge repo repos/$LOG_REPO_NAME is missing. Every session writes there; without it /wrap-up saves to an untracked directory and pushes nothing. This is not optional."
     fi
     if [[ -f "$REPOS_MANIFEST" ]] && command -v jq >/dev/null 2>&1; then
         if ! jq -e --arg n "$LOG_REPO_NAME" \
                 '.repos[]? | select(.name == $n and .clone_url != null and .clone_url != "")' \
                 "$REPOS_MANIFEST" >/dev/null 2>&1; then
-            warn "repos/repos.json has no cloneable entry for the log repo '$LOG_REPO_NAME' — bootstrap cannot obtain it."
+            warn "repos/repos.json has no cloneable entry for the knowledge repo '$LOG_REPO_NAME' — bootstrap cannot obtain it."
         fi
     fi
 fi

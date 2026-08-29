@@ -32,14 +32,14 @@ the compiled wiki (`wiki/`), the taxonomy (`wiki/taxonomy.yaml`) and structured
 research (`research/`). The archetype's own root `knowledge/` directory is
 internal documentation about the archetype and is never copied into projects.
 
-### Log Repo (registered in `repos/`)
+### Knowledge Repo (registered in `repos/`)
 
 Session logs, notes, handoffs, and per-member wiki compilations live in a
-separate log repo. Resolve from `.archetype-manifest.json` → `log_repo_name`.
+separate knowledge repo. Resolve from `.archetype-manifest.json` → `log_repo_name`.
 
-- `<log-repo>/logs/progress/<user>/` — per-user session progress logs
-- `<log-repo>/notes/<user>/` — per-user notes, plans, handoffs
-- `<log-repo>/wiki/<user>/` — per-member wiki compilations
+- `<knowledge-repo>/logs/progress/<user>/` — per-user session progress logs
+- `<knowledge-repo>/notes/<user>/` — per-user notes, plans, handoffs
+- `<knowledge-repo>/wiki/<user>/` — per-member wiki compilations
 
 ## Child Repos
 

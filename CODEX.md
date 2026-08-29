@@ -36,7 +36,7 @@ scripts do not need them — they need to be invoked. **Run them yourself:**
    output and report any WARNING lines to the operator.
 
 Also write a progress log in the knowledge repo —
-`repos/<log-repo>/logs/progress/<user>/`, where `<log-repo>` is the
+`repos/<knowledge-repo>/logs/progress/<user>/`, where `<knowledge-repo>` is the
 `log_repo_name` in `.archetype-manifest.json` — before ending; see recent
 entries there for the format.
 

@@ -3,10 +3,10 @@ set -euo pipefail
 
 # Push logs/notes to their destination.
 #
-# Primary path (split mode): commit+push to the log repo (no branch protections,
+# Primary path (split mode): commit+push to the knowledge repo (no branch protections,
 # no worktree dance needed).
 #
-# Fallback path: if log repo is unresolvable (pre-init, broken path), use the
+# Fallback path: if the knowledge repo is unresolvable (pre-init, broken path), use the
 # legacy worktree approach to push logs/notes to main on the root repo.
 #
 # Safe to call mid-session. Idempotent.
@@ -40,21 +40,21 @@ check_git_repo() {
     fi
 }
 
-# Source hook utilities for log repo resolution
+# Source hook utilities for knowledge repo resolution
 if [[ -f "$ROOT_DIR/scripts/hooks/lib/hook-utils.sh" ]]; then
     PROJECT_DIR="$ROOT_DIR"
     source "$ROOT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
     hook_resolve_log_repo 2>/dev/null || true
 fi
 
-# A log repo that is declared but absent is fatal, not a reason to fall back.
+# A knowledge repo that is declared but absent is fatal, not a reason to fall back.
 # The legacy path below syncs the ROOT repo's logs/ and notes/ — which, when the
-# log repo is simply missing, means the session's records were written to
-# repos/<log-repo>/ (gitignored by root, invisible here), this script finds
+# knowledge repo is simply missing, means the session's records were written to
+# repos/<knowledge-repo>/ (gitignored by root, invisible here), this script finds
 # nothing to copy, prints a cheerful "nothing to push" and exits 0. That is how
 # a whole session's record goes missing without a single error.
 if [[ -n "${LOG_REPO_MISSING:-}" ]]; then
-    fail "log repo not found at $LOG_REPO_MISSING — nothing pushed. Run: bash scripts/bootstrap.sh"
+    fail "knowledge repo not found at $LOG_REPO_MISSING — nothing pushed. Run: bash scripts/bootstrap.sh"
 fi
 
 # Load session ID for commit messages
@@ -74,15 +74,15 @@ fi
 echo $$ > "$LOCK_FILE"
 trap 'rm -f "$LOCK_FILE"' EXIT
 
-# --- Primary path: split mode (log repo is separate) ---
+# --- Primary path: split mode (knowledge repo is separate) ---
 if [[ -n "${LOG_REPO_DIR:-}" && "$LOG_REPO_DIR" != "$ROOT_DIR" && -d "$LOG_REPO_DIR/.git" ]]; then
 
-    # Regenerate handoff index in log repo
+    # Regenerate handoff index in knowledge repo
     if [[ -x "$ROOT_DIR/scripts/utils/generate-handoff-index.sh" ]]; then
         bash "$ROOT_DIR/scripts/utils/generate-handoff-index.sh" "$LOG_REPO_DIR" 2>/dev/null || true
     fi
 
-    check_git_repo "$LOG_REPO_DIR" "log repo"
+    check_git_repo "$LOG_REPO_DIR" "knowledge repo"
     cd "$LOG_REPO_DIR"
 
     # Stage all log/note/wiki content. Every git call below is checked: a
@@ -97,8 +97,8 @@ if [[ -n "${LOG_REPO_DIR:-}" && "$LOG_REPO_DIR" != "$ROOT_DIR" && -d "$LOG_REPO_
         git commit -q -m "logs: session ${SESSION_ID:-unknown} (auto)" \
             || fail "git commit failed in $LOG_REPO_DIR (pre-commit hook? no identity configured?)"
         GIT_TERMINAL_PROMPT=0 git push origin main \
-            || fail "push to log repo failed — logs are committed locally but NOT pushed"
-        echo "push-logs: pushed to log repo"
+            || fail "push to knowledge repo failed — logs are committed locally but NOT pushed"
+        echo "push-logs: pushed to knowledge repo"
     else
         echo "push-logs: nothing to push"
     fi
