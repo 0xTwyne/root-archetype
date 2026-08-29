@@ -52,7 +52,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     fish \
     unzip \
     openssh-client \
-    gh \
     jq \
     vim \
     tmux \
@@ -68,6 +67,31 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     htop \
     time \
     bc \
+  && rm -rf /var/lib/apt/lists/*
+
+# GitHub CLI from GitHub's own apt repository, NOT the distro package.
+#
+# Debian/Ubuntu ship gh 2.46.0 (Jan 2025). That version still queries
+# `repository.pullRequest.projectCards`, a GraphQL field GitHub has since
+# retired, so EVERY `gh pr edit` fails against every repo with:
+#
+#   GraphQL: Projects (classic) is being deprecated ... (projectCards)
+#
+# It fails in the worst way available: inside a compound command the error is
+# easy to miss and the exit status gets swallowed, so an edit looks like it
+# worked and silently changes nothing. Measured 2026-08-29 -- 2.46.0 exits 1,
+# 2.98.0 exits 0 on the identical command.
+#
+# gh create/view/merge/checks and `gh api` are unaffected, which is why this
+# went unnoticed; only `pr edit` touches the retired field.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  mkdir -p -m 755 /etc/apt/keyrings \
+  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+       -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+       > /etc/apt/sources.list.d/github-cli.list \
+  && apt-get update && apt-get install -y --no-install-recommends gh \
   && rm -rf /var/lib/apt/lists/*
 RUN if command -v fdfind >/dev/null 2>&1 && [ ! -e /usr/local/bin/fd ]; then \
     ln -s /usr/bin/fdfind /usr/local/bin/fd; \

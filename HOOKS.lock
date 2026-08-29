@@ -3,7 +3,7 @@
 # Locked roots: scripts/hooks scripts/validate
 # Excluded:     scripts/hooks/lib/tools.lock
 #
-# Regenerated: 2026-08-29T17:57:09Z
+# Regenerated: 2026-08-29T18:08:11Z
 # By:          scripts/validate/update_hooks_lock.sh
 #
 # A drifted lock means a hook or validator changed since last review.

@@ -87,6 +87,33 @@ else
     check_warn "Low disk space: ${AVAIL_GB}GB available"
 fi
 
+# --- GitHub CLI version ---
+#
+# The Dockerfile now installs gh from cli.github.com, but an image built before
+# that change still carries the distro package (2.46.0, Jan 2025). That version
+# queries a GraphQL field GitHub has retired, so EVERY `gh pr edit` fails --
+# and fails quietly enough to look like it worked. Warn rather than fail: gh
+# create/view/merge/checks and `gh api` are all fine, so a stale gh is a
+# nuisance, not a broken environment.
+#
+# 2.55 is a conservative floor; 2.46.0 is the version measured broken.
+if command -v gh >/dev/null 2>&1; then
+    # The trailing `head -1` is not redundant: `gh --version` prints
+    # "gh version 2.46.0 (2025-01-13 Ubuntu 2.46.0-3)", grep -oE emits EVERY
+    # match, and without it GH_VER becomes the two-line string "2.46.0\n2.46.0"
+    # -- which then splits the warning across two lines. Same shape as the
+    # "HEAD\nunknown" provenance bug fixed in agent_log.sh.
+    GH_VER="$(gh --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+    if [[ -n "$GH_VER" ]]; then
+        GH_MAJ="${GH_VER%%.*}"; GH_REST="${GH_VER#*.}"; GH_MIN="${GH_REST%%.*}"
+        if [[ "$GH_MAJ" -lt 2 || ( "$GH_MAJ" -eq 2 && "$GH_MIN" -lt 55 ) ]]; then
+            check_warn "gh ${GH_VER} is too old — 'gh pr edit' fails on every repo (retired Projects GraphQL field), and fails quietly. Rebuild the devcontainer, or use: gh api -X PATCH repos/OWNER/REPO/pulls/N -F body=@file"
+        else
+            check_pass "gh ${GH_VER}"
+        fi
+    fi
+fi
+
 # --- Summary ---
 echo ""
 echo "Results: ${PASS} pass, ${WARN} warn, ${FAIL} fail"
