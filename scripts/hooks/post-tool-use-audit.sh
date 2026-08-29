@@ -40,8 +40,13 @@ if [[ -f "$STATS_FILE" ]]; then
 fi
 
 # --- Append audit record ---
-# Lands in the log repo (logs/audit/<user>/) when resolvable, else the root
-# repo. On failure: diagnose to stderr, never block the session.
+# Lands in the log repo (logs/audit/<user>/). There is NO root-repo fallback:
+# audit entries written to the root repo exist in the log repo nowhere, which is
+# exactly the four-month silent split this system already suffered once. If the
+# log repo cannot be written, say so loudly and drop the record — a visible gap
+# beats a trail that quietly forked. (In genuine single-repo mode, with no
+# log_repo_name declared, LOG_REPO_DIR resolves to the root repo and writing
+# there is correct.)
 hook_resolve_log_repo "$PROJECT_DIR" 2>/dev/null || true
 
 case "$TOOL_NAME" in
@@ -69,17 +74,13 @@ if [[ -z "$RECORD" ]]; then
   exit 0
 fi
 
-AUDIT_WRITTEN=""
-for BASE in "${LOG_REPO_DIR:-$PROJECT_DIR}" "$PROJECT_DIR"; do
-  AUDIT_DIR="$BASE/logs/audit/$SESSION_USER"
-  if mkdir -p "$AUDIT_DIR" 2>/dev/null \
-     && echo "$RECORD" >> "$AUDIT_DIR/tool-calls-$(date -u +%Y-%m-%d).jsonl" 2>/dev/null; then
-    AUDIT_WRITTEN="yes"
-    break
+AUDIT_DIR="${LOG_REPO_DIR:-$PROJECT_DIR}/logs/audit/$SESSION_USER"
+if ! { mkdir -p "$AUDIT_DIR" 2>/dev/null \
+       && echo "$RECORD" >> "$AUDIT_DIR/tool-calls-$(date -u +%Y-%m-%d).jsonl" 2>/dev/null; }; then
+  echo "post-tool-use-audit: could not write audit record under $AUDIT_DIR (check ownership/permissions) — record DROPPED, not redirected" >&2
+  if declare -F agent_warn >/dev/null 2>&1; then
+    agent_warn "post-tool-use-audit: audit write failed" "dir=$AUDIT_DIR tool=$TOOL_NAME" 2>/dev/null || true
   fi
-done
-if [[ -z "$AUDIT_WRITTEN" ]]; then
-  echo "post-tool-use-audit: could not write audit record under ${LOG_REPO_DIR:-$PROJECT_DIR}/logs/audit/$SESSION_USER or $PROJECT_DIR/logs/audit/$SESSION_USER (check ownership/permissions)" >&2
 fi
 
 # Never blocks — exit 0 even when the audit write failed (diagnosed above)

@@ -25,7 +25,25 @@ except ImportError:
     print("ERROR: PyYAML not installed. Run: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
-ROOT = Path(__file__).resolve().parents[4]  # epyc-root
+ROOT = Path(__file__).resolve().parents[4]  # project root (…/.claude/skills/project-wiki/scripts/ → root)
+
+
+def _log_repo_root() -> Path:
+    """Resolve the log repo the way the hooks and lint_wiki.py do.
+
+    Handoffs live there, not in the root repo. This script used to search
+    ROOT-relative handoff directories that have never existed in a split-mode
+    project, so handoff_matches was silently always empty.
+    """
+    manifest = ROOT / ".archetype-manifest.json"
+    if manifest.exists():
+        try:
+            name = json.loads(manifest.read_text()).get("log_repo_name", "")
+        except Exception:
+            name = ""
+        if name and (ROOT / "repos" / name).is_dir():
+            return ROOT / "repos" / name
+    return ROOT
 
 
 def load_wiki_config() -> dict:
@@ -183,15 +201,20 @@ def main() -> int:
     config = load_wiki_config()
     query_terms = [t.lower() for t in args.query.split() if len(t) > 1]
 
-    # Resolve paths
+    # Resolve paths. Intake index and deep-dives are root-repo knowledge/
+    # artifacts (current design); handoffs live in the log repo, per user.
     index_path = ROOT / config.get("cross_references", {}).get("intake_index",
-        "research/intake_index.yaml")
-    handoff_paths_cfg = config.get("cross_references", {}).get("handoffs", {}).get("paths",
-        ["handoffs/active", "handoffs/completed"])
-    handoff_dirs = [ROOT / p if not Path(p).is_absolute() else Path(p)
-                    for p in handoff_paths_cfg]
+        "knowledge/research/intake_index.yaml")
+    log_root = _log_repo_root()
+    handoff_paths_cfg = config.get("cross_references", {}).get("handoffs", {}).get("paths")
+    if handoff_paths_cfg:
+        handoff_dirs = [log_root / p if not Path(p).is_absolute() else Path(p)
+                        for p in handoff_paths_cfg]
+    else:
+        # Default: every user's active + completed handoffs, plus the shared dir
+        handoff_dirs = sorted(log_root.glob("notes/*/handoffs/active"))                      + sorted(log_root.glob("notes/*/handoffs/completed"))                      + [log_root / "notes" / "handoffs"]
     deep_dive_rel = config.get("cross_references", {}).get("deep_dives", {}).get("path",
-        "research/deep-dives")
+        "knowledge/research/deep-dives")
     deep_dive_dir = ROOT / deep_dive_rel
 
     # Search

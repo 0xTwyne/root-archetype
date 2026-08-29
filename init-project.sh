@@ -92,7 +92,17 @@ if [[ -z "$COPY_TO" ]]; then
     # used to leave the previous owner's history in the new project.
     rm -f notes/handoffs/INDEX.md 2>/dev/null || true
     find logs/progress -mindepth 2 -name '*.md' -delete 2>/dev/null || true
+    find logs/audit -mindepth 2 -type f -delete 2>/dev/null || true
     find notes -mindepth 2 -path '*/handoffs/*' -name '*.md' -delete 2>/dev/null || true
+    # The archetype's own knowledge base must not become the new project's.
+    # knowledge/wiki/*.md documents root-archetype itself; the research intake
+    # and .promoted-sources are the archetype's OWN instance data (one
+    # contributor's session paths shipped into every spawned project until
+    # 2026-08-29). taxonomy.yaml is config, not instance data — it stays.
+    rm -f .promoted-sources 2>/dev/null || true
+    find knowledge/wiki -name '*.md' -delete 2>/dev/null || true
+    find knowledge/research/deep-dives -name '*.md' -delete 2>/dev/null || true
+    rm -f knowledge/research/intake_index.yaml 2>/dev/null || true
 else
     # Copy mode: clone archetype tree to target
     PROJECT_ROOT="$COPY_TO"
@@ -101,9 +111,12 @@ else
         git init "$PROJECT_ROOT" >/dev/null
         git -C "$PROJECT_ROOT" checkout -b main 2>/dev/null || true
     fi
-    # Copy tracked content, excluding instance-specific data
+    # Copy tracked content, excluding instance-specific data: session history
+    # (progress, audit, handoffs), and the archetype's own knowledge base —
+    # its self-documentation wiki, research intake and promotion state. Only
+    # taxonomy.yaml (config) crosses over from knowledge/.
     (cd "$ARCHETYPE_DIR" && git ls-files -z 2>/dev/null || find . -type f -not -path './.git/*' -print0) | \
-        grep -zvE '^(logs/progress/|notes/.*/handoffs/|notes/handoffs/INDEX)' | \
+        grep -zvE '^(logs/progress/|logs/audit/|notes/.*/handoffs/|notes/handoffs/INDEX|knowledge/wiki/.*\.md|knowledge/research/deep-dives/.*\.md|knowledge/research/intake_index\.yaml|\.promoted-sources)' | \
         (cd "$ARCHETYPE_DIR" && xargs -0 -I{} bash -c '[[ -f "{}" ]] || exit 0; mkdir -p "'"$PROJECT_ROOT"'/$(dirname "{}")" && cp "{}" "'"$PROJECT_ROOT"'/{}"')
     chmod +x "$PROJECT_ROOT"/scripts/**/*.sh "$PROJECT_ROOT"/scripts/**/*.py 2>/dev/null || true
 fi

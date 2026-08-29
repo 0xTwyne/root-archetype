@@ -11,7 +11,21 @@ while [[ "$_CRSAFE" != "/" && ! -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]]; do
 done
 [[ -f "$_CRSAFE/scripts/lib/cr-safe-jq.sh" ]] && source "$_CRSAFE/scripts/lib/cr-safe-jq.sh"
 
-_AGENT_LOG_DIR="${AGENT_LOG_DIR:-${LOG_REPO_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || echo ".")}/logs}"
+_agent_log_default_dir() {
+    local root; root="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
+    # Prefer an already-exported LOG_REPO_DIR (hooks resolve it before sourcing
+    # this file); otherwise resolve it the same way they do. Falling back to
+    # the git toplevel unconditionally is how the root repo accumulated audit
+    # entries that existed in the log repo nowhere — the resolver only returns
+    # the root when no log_repo_name is declared (genuine single-repo mode).
+    if [[ -z "${LOG_REPO_DIR:-}" && -f "$root/scripts/hooks/lib/log-repo.sh" ]]; then
+        # shellcheck source=/dev/null
+        PROJECT_DIR="$root" source "$root/scripts/hooks/lib/log-repo.sh" 2>/dev/null || true
+        hook_resolve_log_repo "$root" >/dev/null 2>&1 || true
+    fi
+    echo "${LOG_REPO_DIR:-$root}/logs"
+}
+_AGENT_LOG_DIR="${AGENT_LOG_DIR:-$(_agent_log_default_dir)}"
 _AGENT_LOG_FILE="${_AGENT_LOG_DIR}/agent_audit.log"
 _AGENT_SESSION_FILE="${_AGENT_LOG_DIR}/.current_session"
 _AGENT_SESSION_STALE_HOURS=4
