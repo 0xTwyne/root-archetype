@@ -61,7 +61,21 @@ def _resolve_log_repo(root: Path) -> Path:
 
 ROOT = _find_project_root()
 
-LAST_COMPILE_PATH = ROOT / "knowledge" / "research" / ".last_compile"
+# The compile watermark lives in the knowledge repo, next to the state it
+# describes (.promoted-sources is already there). The legacy root-repo location
+# is honoured READ-ONLY so a live project keeps its incremental behaviour until
+# its first --touch migrates the watermark; writes always go to the new path.
+_LEGACY_LAST_COMPILE = ROOT / "knowledge" / "research" / ".last_compile"
+
+
+def _last_compile_path() -> "Path":
+    new_path = _resolve_log_repo(ROOT) / ".last_compile"
+    if not new_path.exists() and _LEGACY_LAST_COMPILE.exists():
+        return _LEGACY_LAST_COMPILE
+    return new_path
+
+
+LAST_COMPILE_PATH = _last_compile_path()
 
 # Source type definitions: (base_dir, subdirectory pattern, type label)
 # Each entry is scanned relative to the log repo (or ROOT in single-repo mode).
@@ -139,6 +153,8 @@ def get_last_compile_iso() -> str | None:
 
 
 def touch_last_compile() -> None:
+    global LAST_COMPILE_PATH
+    LAST_COMPILE_PATH = _resolve_log_repo(ROOT) / ".last_compile"
     """Write current UTC timestamp to .last_compile."""
     LAST_COMPILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

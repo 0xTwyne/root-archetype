@@ -325,9 +325,14 @@ if [[ -f "$PROJECT_DIR/.needs-init" ]]; then
 fi
 
 # --- Stale wiki detection (scan log repo sources) ---
-if [[ -f "$PROJECT_DIR/knowledge/research/.last_compile" ]]; then
+# The watermark lives in the knowledge repo; the legacy root location is read
+# as a fallback for projects that have not migrated.
+_LC="${LOG_REPO_DIR:-$PROJECT_DIR}/.last_compile"
+[[ ! -f "$_LC" && -f "$PROJECT_DIR/knowledge/research/.last_compile" ]] \
+  && _LC="$PROJECT_DIR/knowledge/research/.last_compile"
+if [[ -f "$_LC" ]]; then
   _LOG_DIR="${LOG_REPO_DIR:-$PROJECT_DIR}"
-  NEWEST_SOURCE="$(find "$_LOG_DIR/logs/progress" "$_LOG_DIR/notes" -name '*.md' -newer "$PROJECT_DIR/knowledge/research/.last_compile" 2>/dev/null | head -1)"
+  NEWEST_SOURCE="$(find "$_LOG_DIR/logs/progress" "$_LOG_DIR/notes" -name '*.md' -newer "$_LC" 2>/dev/null | head -1)"
   if [[ -n "$NEWEST_SOURCE" ]]; then
     CONTEXT+="Knowledge base may be stale. Run /project-wiki compile to update.\n"
   fi

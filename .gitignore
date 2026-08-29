@@ -45,6 +45,9 @@ tmp/*
 
 # Knowledge research compile cache
 knowledge/research/.last_compile
+# Compile watermark in single-repo mode (log repo == root); split-mode projects
+# keep it in the knowledge repo, ignored by the knowledge repo's own .gitignore.
+/.last_compile
 
 # Secrets (directory tracked, contents ignored)
 secrets/*

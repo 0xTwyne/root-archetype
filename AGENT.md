@@ -27,8 +27,10 @@ Umbrella repository for cross-repo coordination and governance. No application c
 
 ## Knowledge
 
-- `knowledge/wiki/` — compiled master wiki (maintained by project maintainers)
-- `knowledge/research/` — structured research and deep dives
+All project knowledge lives in the knowledge repo (`repos/<log_repo_name>/`):
+the compiled wiki (`wiki/`), the taxonomy (`wiki/taxonomy.yaml`) and structured
+research (`research/`). The archetype's own root `knowledge/` directory is
+internal documentation about the archetype and is never copied into projects.
 
 ### Log Repo (registered in `repos/`)
 

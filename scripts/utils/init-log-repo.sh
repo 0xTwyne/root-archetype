@@ -49,6 +49,7 @@ mkdir -p "$LOG_REPO_PATH/logs/audit" \
          "$LOG_REPO_PATH/logs/progress" \
          "$LOG_REPO_PATH/logs/skills" \
          "$LOG_REPO_PATH/notes/handoffs" \
+         "$LOG_REPO_PATH/research/deep-dives" \
          "$LOG_REPO_PATH/wiki"
 
 touch "$LOG_REPO_PATH/logs/.gitkeep" \
@@ -57,6 +58,7 @@ touch "$LOG_REPO_PATH/logs/.gitkeep" \
       "$LOG_REPO_PATH/logs/skills/.gitkeep" \
       "$LOG_REPO_PATH/notes/.gitkeep" \
       "$LOG_REPO_PATH/notes/handoffs/.gitkeep" \
+      "$LOG_REPO_PATH/research/deep-dives/.gitkeep" \
       "$LOG_REPO_PATH/wiki/.gitkeep" 2>/dev/null || true
 
 # --- Seed wiki schema, index builder, and facts cache ---
@@ -97,6 +99,8 @@ COPY_FAILED=0
 copy_required "$TEMPLATE_DIR/scripts/build-indexes.sh" "$LOG_REPO_PATH/scripts/build-indexes.sh" || COPY_FAILED=1
 copy_required "$TEMPLATE_DIR/wiki/schema.md"           "$LOG_REPO_PATH/wiki/schema.md"           || COPY_FAILED=1
 copy_required "$TEMPLATE_DIR/wiki/README.md"           "$LOG_REPO_PATH/wiki/README.md"           || COPY_FAILED=1
+copy_required "$TEMPLATE_DIR/wiki/taxonomy.yaml"        "$LOG_REPO_PATH/wiki/taxonomy.yaml"       || COPY_FAILED=1
+copy_required "$TEMPLATE_DIR/research/intake_index.yaml" "$LOG_REPO_PATH/research/intake_index.yaml" || COPY_FAILED=1
 [[ "$COPY_FAILED" -eq 0 ]] || { echo "ERROR: log repo is incomplete — aborting rather than shipping a broken one." >&2; exit 1; }
 
 # AGENT.md — the rules for writing to and pushing this repo. A log repo without
@@ -123,6 +127,18 @@ if [[ -f "$TEMPLATE_DIR/identities.json.tmpl" ]]; then
 else
     echo "ERROR: required template missing: $TEMPLATE_DIR/identities.json.tmpl" >&2
     exit 1
+fi
+
+# Runtime state the knowledge repo must never track: the compile watermark and
+# the per-machine session marker (tracking the latter once pushed one machine's
+# session id into every clone).
+if [[ ! -f "$LOG_REPO_PATH/.gitignore" ]]; then
+    printf '%s\n' \
+        "# Compile watermark — per-clone runtime state" \
+        ".last_compile" \
+        "# Which session is active on THIS machine — never track" \
+        "logs/.current_session" \
+        > "$LOG_REPO_PATH/.gitignore"
 fi
 
 # facts.md is per-user and created on first session by the session-start hook.
