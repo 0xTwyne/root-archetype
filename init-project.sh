@@ -169,6 +169,16 @@ echo ""
 echo "Creating knowledge repo: ${LOG_REPO_NAME}"
 echo "  Path: ${LOG_REPO_PATH} $([[ -z "$LOG_REPO_OVERRIDE" ]] && echo "(default)" || echo "(custom)")"
 
+# Route audit logging at the knowledge repo for the rest of init.
+#
+# .archetype-manifest.json is not written until much later in this script, and
+# hook_resolve_log_repo reads log_repo_name from it. Until then the resolver
+# finds no manifest, concludes single-repo mode, and every audit entry from
+# register-repo.sh below lands in the ROOT repo's logs/ -- the exact split-brain
+# the April 2026 log migration existed to end. ARCHETYPE_LOG_REPO is the
+# resolver's own documented override and takes precedence over the manifest.
+export ARCHETYPE_LOG_REPO="$LOG_REPO_PATH"
+
 GITHUB_FLAG=""
 [[ -n "$GH_USER" ]] && command -v gh &>/dev/null && GITHUB_FLAG="--github"
 bash scripts/utils/init-log-repo.sh "$LOG_REPO_PATH" "$PROJECT_NAME" $GITHUB_FLAG 2>/dev/null || {
@@ -338,6 +348,36 @@ fi
     [[ -f "$f" ]] || { echo "  WARN: Missing $f"; WARN=1; }
 done
 [[ "$ENGINE" == codex ]] && [[ -f CODEX.md ]] || { [[ "$ENGINE" != codex ]] || { echo "  WARN: Missing CODEX.md"; WARN=1; }; }
+# --- Security baseline: generate the per-installation locks ---
+#
+# These were previously a "one-time setup after cloning" instruction in the
+# README, which meant every new project ran with two advertised security layers
+# inert until somebody read that far and remembered:
+#
+#   tools.lock  - pins git/jq/python3 to absolute paths so a hook cannot be
+#                 redirected via $PATH. Without it hook_resolve_tool falls back
+#                 to PATH lookup and `session-start.sh --argv` reports FALLBACK
+#                 for every tool.
+#   HOOKS.lock  - sha256 of scripts/hooks/ + scripts/validate/, so tampering is
+#                 detectable. Without it validate_hooks_lock.sh has nothing to
+#                 compare against.
+#
+# Both are per-installation artifacts, so they must be generated here rather
+# than shipped. Non-fatal: a project that cannot generate them is still usable,
+# it is just not locked, and it says so.
+echo ""
+echo "Generating security baseline..."
+if [[ -x scripts/hooks/lib/tools-init.sh ]]; then
+    bash scripts/hooks/lib/tools-init.sh >/dev/null 2>&1 \
+        && echo "  tools.lock: generated" \
+        || { echo "  WARN: tools.lock generation failed — tool pinning inactive"; WARN=1; }
+fi
+if [[ -x scripts/validate/update_hooks_lock.sh ]]; then
+    bash scripts/validate/update_hooks_lock.sh >/dev/null 2>&1 \
+        && echo "  HOOKS.lock: generated" \
+        || { echo "  WARN: HOOKS.lock generation failed — drift detection inactive"; WARN=1; }
+fi
+
 [[ $WARN -eq 0 ]] && echo "Validation passed." || echo "Validation completed with warnings."
 echo ""
 echo "=== Initialized: ${PROJECT_NAME} (engine: ${ENGINE}) ==="
