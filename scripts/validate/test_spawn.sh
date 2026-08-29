@@ -155,9 +155,19 @@ if [[ -f "$KNOW/notes/handoffs/INDEX.md" ]]; then
 fi
 
 # --- session-start in the throwaway --------------------------------------
-if CLAUDE_PROJECT_DIR="$DEST" timeout 60 bash scripts/hooks/session-start.sh --argv >/dev/null 2>&1; then
-    ok "session-start.sh --argv"
-else bad "session-start.sh --argv" "non-zero exit"; fi
+argv_out="$(CLAUDE_PROJECT_DIR="$DEST" timeout 60 bash scripts/hooks/session-start.sh --argv 2>&1)" \
+    && ok "session-start.sh --argv" \
+    || bad "session-start.sh --argv" "non-zero exit"
+
+# tools.lock existing is not the same as tools.lock working. A lock generated
+# on a machine missing jq satisfies an existence check while pinning nothing;
+# --argv reports FALLBACK per tool when the lock did not resolve it.
+if grep -q "FALLBACK" <<<"$argv_out"; then
+    bad "tools.lock actually pins the toolchain" \
+        "--argv still reports FALLBACK: $(grep FALLBACK <<<"$argv_out" | head -1 | xargs)"
+else
+    ok "tools.lock actually pins the toolchain (no FALLBACK)"
+fi
 
 # --- The project is its own repo, not a fork of the archetype -------------
 # If a spawned project inherited the archetype's remote or history, every
@@ -247,6 +257,78 @@ if [[ -z "$leftover" ]]; then
 else
     bad "push-logs.sh leaves nothing uncommitted in the knowledge repo" \
         "still dirty: $(echo $leftover | cut -c1-60)"
+fi
+
+# --- Other spawn shapes ---------------------------------------------------
+# The deep pass above covers one shape: --copy-to, engine claude, no child
+# repos. These are the other documented ways to spawn, each asserted on the
+# thing that makes it different. Lighter than the deep pass on purpose --
+# the point is that the shape works at all, which nothing checked before.
+echo ""
+echo "  -- other spawn shapes --"
+
+shape() {   # shape <name> <extra init args...>
+    local name="$1"; shift
+    ( cd "$ARCHETYPE_DIR" && GH_CONFIG_DIR="$SANDBOX/no-gh" \
+        timeout 300 bash init-project.sh "$name" --copy-to "$SANDBOX/$name" "$@" \
+    ) >"$SANDBOX/$name.log" 2>&1
+}
+
+# engine codex: keeps CODEX.md, drops CLAUDE.md, and its validators still pass
+if shape codexproj --engine codex; then
+    ok "spawn --engine codex exits 0"
+    [[ -f "$SANDBOX/codexproj/CODEX.md" ]] && ok "codex spawn keeps CODEX.md" \
+        || bad "codex spawn keeps CODEX.md" "missing"
+    [[ ! -f "$SANDBOX/codexproj/CLAUDE.md" ]] && ok "codex spawn drops CLAUDE.md" \
+        || bad "codex spawn drops CLAUDE.md" "still present"
+    if ( cd "$SANDBOX/codexproj" && python3 scripts/validate/validate_claude_md_consistency.py >/dev/null 2>&1 ); then
+        ok "codex spawn passes instruction-file consistency"
+    else bad "codex spawn passes instruction-file consistency" "non-zero exit"; fi
+else
+    bad "spawn --engine codex exits 0" "see $SANDBOX/codexproj.log"
+fi
+
+# --guided: leaves the marker the init wizard keys off
+if shape guidedproj --guided; then
+    ok "spawn --guided exits 0"
+    [[ -f "$SANDBOX/guidedproj/.needs-init" ]] && ok "--guided leaves the .needs-init marker" \
+        || bad "--guided leaves the .needs-init marker" "missing — the wizard will never trigger"
+else
+    bad "spawn --guided exits 0" "see $SANDBOX/guidedproj.log"
+fi
+
+# --repos: registers a child repo alongside the knowledge repo
+CHILD="$SANDBOX/childlib"
+mkdir -p "$CHILD"
+( cd "$CHILD" && git init -q . && git commit -q --allow-empty -m init ) >/dev/null 2>&1
+if shape reposproj --repos "childlib:$CHILD"; then
+    ok "spawn --repos exits 0"
+    [[ -d "$SANDBOX/reposproj/repos/childlib" ]] && ok "--repos links the child repo" \
+        || bad "--repos links the child repo" "repos/childlib missing"
+    if jq -e '[.repos[].name] | index("childlib") and index("reposproj-knowledge")' \
+         "$SANDBOX/reposproj/repos/repos.json" >/dev/null 2>&1; then
+        ok "--repos registers child and knowledge repos together"
+    else
+        bad "--repos registers child and knowledge repos together" \
+            "repos.json: $(jq -c '[.repos[].name]' "$SANDBOX/reposproj/repos/repos.json" 2>/dev/null)"
+    fi
+else
+    bad "spawn --repos exits 0" "see $SANDBOX/reposproj.log"
+fi
+
+# in-place: the documented default (clone the archetype, init inside it)
+INPLACE="$SANDBOX/inplace"
+mkdir -p "$INPLACE"
+tar -C "$ARCHETYPE_DIR" --exclude=.git -cf - . 2>/dev/null | tar -C "$INPLACE" -xf - 2>/dev/null
+( cd "$INPLACE" && git init -q . && git add -A && git commit -q -m base ) >/dev/null 2>&1
+if ( cd "$INPLACE" && GH_CONFIG_DIR="$SANDBOX/no-gh" timeout 300 bash init-project.sh inplaceproj ) \
+     >"$SANDBOX/inplace.log" 2>&1; then
+    ok "in-place spawn (no --copy-to) exits 0"
+    [[ -d "$INPLACE/repos/inplaceproj-knowledge" ]] \
+        && ok "in-place spawn creates its knowledge repo" \
+        || bad "in-place spawn creates its knowledge repo" "missing"
+else
+    bad "in-place spawn (no --copy-to) exits 0" "see $SANDBOX/inplace.log"
 fi
 
 echo ""
