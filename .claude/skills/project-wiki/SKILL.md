@@ -74,12 +74,12 @@ Invoke with: "compile the wiki" / "update knowledge base"
 Run the manifest scanner to identify what needs compilation:
 
 ```
-python3 agents/skills/project-wiki/scripts/compile_sources.py
+python3 .claude/skills/project-wiki/scripts/compile_sources.py
 ```
 
 For a full recompilation (ignore last compile timestamp):
 ```
-python3 agents/skills/project-wiki/scripts/compile_sources.py --full
+python3 .claude/skills/project-wiki/scripts/compile_sources.py --full
 ```
 
 Review the output JSON. The `sources` array lists every file to consider.
@@ -179,7 +179,7 @@ bash scripts/utils/generate-handoff-index.sh
 
 After successful compilation:
 ```
-python3 agents/skills/project-wiki/scripts/compile_sources.py --touch
+python3 .claude/skills/project-wiki/scripts/compile_sources.py --touch
 ```
 
 Or manually:

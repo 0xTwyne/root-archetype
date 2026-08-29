@@ -35,8 +35,10 @@ scripts do not need them — they need to be invoked. **Run them yourself:**
    branch, pushes it, and opens a PR. Failures are printed loudly — read the
    output and report any WARNING lines to the operator.
 
-Also write a progress log (`repos/sangha-knowledge/logs/progress/<user>/`)
-before ending — see recent entries there for the format.
+Also write a progress log in the knowledge repo —
+`repos/<log-repo>/logs/progress/<user>/`, where `<log-repo>` is the
+`log_repo_name` in `.archetype-manifest.json` — before ending; see recent
+entries there for the format.
 
 Not replicable under Codex: the per-tool-call audit trail (needs harness
 callbacks). Codex sessions are audited coarsely via git history and the
