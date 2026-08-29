@@ -115,9 +115,19 @@ for v in scripts/validate/validate_*.py; do
 done
 
 # --- Hooks are actually wired -------------------------------------------
-wired="$(grep -o 'hooks/[a-z_-]*\.sh' .claude/settings.json 2>/dev/null | sort -u | wc -l | tr -d ' ')"
-[[ "$wired" -ge 5 ]] && ok "$wired hooks wired in .claude/settings.json" \
-                     || bad "hooks wired in .claude/settings.json" "only $wired"
+# Exact set, not a count. A count passes while a settings change silently
+# drops check_secrets_read.sh and adds something else in its place.
+WIRED="$(grep -o 'hooks/[a-z_-]*\.sh' .claude/settings.json 2>/dev/null \
+         | sed 's|hooks/||' | sort -u)"
+SHIPPED="$(ls scripts/hooks/*.sh 2>/dev/null | xargs -n1 basename | sort)"
+UNWIRED="$(comm -23 <(echo "$SHIPPED") <(echo "$WIRED") || true)"
+GHOST="$(comm -13 <(echo "$SHIPPED") <(echo "$WIRED") || true)"
+if [[ -z "$UNWIRED" && -z "$GHOST" ]]; then
+    ok "all $(echo "$SHIPPED" | wc -l | tr -d ' ') shipped hooks are wired"
+else
+    [[ -n "$UNWIRED" ]] && bad "every shipped hook is wired" "unwired: $(echo $UNWIRED)"
+    [[ -n "$GHOST" ]]   && bad "no wiring points at a missing hook" "missing: $(echo $GHOST)"
+fi
 
 for t in scripts/hooks/tests/*.sh; do
     [[ -f "$t" ]] || continue
@@ -145,9 +155,181 @@ if [[ -f "$KNOW/notes/handoffs/INDEX.md" ]]; then
 fi
 
 # --- session-start in the throwaway --------------------------------------
-if CLAUDE_PROJECT_DIR="$DEST" timeout 60 bash scripts/hooks/session-start.sh --argv >/dev/null 2>&1; then
-    ok "session-start.sh --argv"
-else bad "session-start.sh --argv" "non-zero exit"; fi
+argv_out="$(CLAUDE_PROJECT_DIR="$DEST" timeout 60 bash scripts/hooks/session-start.sh --argv 2>&1)" \
+    && ok "session-start.sh --argv" \
+    || bad "session-start.sh --argv" "non-zero exit"
+
+# tools.lock existing is not the same as tools.lock working. A lock generated
+# on a machine missing jq satisfies an existence check while pinning nothing;
+# --argv reports FALLBACK per tool when the lock did not resolve it.
+if grep -q "FALLBACK" <<<"$argv_out"; then
+    bad "tools.lock actually pins the toolchain" \
+        "--argv still reports FALLBACK: $(grep FALLBACK <<<"$argv_out" | head -1 | xargs)"
+else
+    ok "tools.lock actually pins the toolchain (no FALLBACK)"
+fi
+
+# --- The project is its own repo, not a fork of the archetype -------------
+# If a spawned project inherited the archetype's remote or history, every
+# commit and every wrap-up push would land in the archetype instead.
+remotes="$(git remote -v 2>/dev/null || true)"
+[[ -z "$remotes" ]] && ok "no remote inherited from the archetype" \
+                    || bad "no remote inherited from the archetype" "$(echo "$remotes" | head -1)"
+if git -C "$KNOW" remote -v 2>/dev/null | grep -q .; then
+    bad "knowledge repo has no inherited remote" "one is set"
+else ok "knowledge repo has no inherited remote"; fi
+
+# --- Collaborative use: two team members ---------------------------------
+TODAY="$(date -u +%Y-%m-%d)"
+# A project that works for the person who spawned it and nobody else is not
+# wired for collaborative use. Simulate two members producing the artifacts
+# the pipeline is built around, then run the compilers over them.
+for U in alice bob; do
+    mkdir -p "$KNOW/logs/progress/$U" "$KNOW/logs/audit/$U" \
+             "$KNOW/notes/$U/handoffs/active" "$KNOW/notes/$U/handoffs/completed"
+    # Dated today on purpose: the progress index lists member names only
+    # inside its recent window and collapses anything older into a bare
+    # count, so a fixed past date would make the assertion below test nothing.
+    printf '# Progress: %s\n\n## Wrap-up: 09:00 UTC\n\n### What was done\n\n- %s exercised the pipeline\n' \
+        "$TODAY" "$U" > "$KNOW/logs/progress/$U/${TODAY}.md"
+    printf '# Handoff: %s to the other member\n\n**To:** other\n**From:** %s\n**Status:** active\n\n## The ask\n\nExercise the handoff index.\n' \
+        "$U" "$U" > "$KNOW/notes/$U/handoffs/active/2026-01-15_to-other_pipeline.md"
+    printf '# Notes\n\nScratch notes for %s.\n' "$U" > "$KNOW/notes/$U/scratch.md"
+done
+
+printf -- '---\ntitle: Two Member Pipeline\ncategory: concept\nscope: [%s]\ntags: [collaboration, indexing]\nsources:\n  - scripts/build-indexes.sh\ncreated: 2026-01-15\nupdated: 2026-01-15\nconfidence: verified\n---\n\n# Two Member Pipeline\n\n> Fixture article proving wiki compilation indexes a real category.\n\n## Key Facts\n\n- Written by the spawn test.\n' \
+    "${PROJ}-knowledge" > "$KNOW/wiki/concepts/two-member-pipeline.md"
+
+if bash scripts/build-indexes.sh >/dev/null 2>&1; then ok "build-indexes.sh with two members' content"
+else bad "build-indexes.sh with two members' content" "non-zero exit"; fi
+
+PIDX="$KNOW/logs/progress/INDEX.md"
+if [[ -f "$PIDX" ]] && grep -q alice "$PIDX" && grep -q bob "$PIDX"; then
+    ok "progress index lists both members"
+else bad "progress index lists both members" "alice/bob missing from $PIDX"; fi
+
+NIDX="$KNOW/notes/INDEX.md"
+[[ -s "$NIDX" ]] && ok "notes index generated and non-empty" \
+                 || bad "notes index generated and non-empty" "missing or empty"
+
+WIDX="$KNOW/wiki/INDEX.md"
+if [[ -f "$WIDX" ]] && grep -q "two-member-pipeline" "$WIDX"; then
+    if grep -q "unknown/unknown" "$WIDX"; then
+        bad "wiki index resolves the article's category" "found unknown/unknown rows"
+    else ok "wiki index lists the article under a real category"; fi
+else bad "wiki index lists the article" "not found in $WIDX"; fi
+
+[[ -f "$KNOW/wiki/STALENESS.md" ]] && ok "staleness report generated" \
+                                   || bad "staleness report generated" "missing"
+
+hout2="$(bash scripts/utils/generate-handoff-index.sh 2>&1 | tail -1)"
+if grep -q "2 entries, 2 users" <<<"$hout2"; then
+    ok "handoff index counts both members' handoffs"
+else bad "handoff index counts both members' handoffs" "got: $hout2"; fi
+
+HIDX="$KNOW/notes/handoffs/INDEX.md"
+if [[ -f "$HIDX" ]] && grep -q alice "$HIDX" && grep -q bob "$HIDX"; then
+    ok "handoff index names both members"
+else bad "handoff index names both members" "alice/bob missing"; fi
+
+# Audit logging must route per-user into the knowledge repo, for a user who
+# is not the person who spawned the project.
+( export CLAUDE_PROJECT_DIR="$DEST"
+  source scripts/utils/agent_log.sh 2>/dev/null || true
+  agent_task_start "collaborative pipeline probe" "alice" >/dev/null 2>&1 || true ) || true
+if grep -q "collaborative pipeline probe" "$KNOW/logs/agent_audit.log" 2>/dev/null; then
+    ok "agent_log writes into the knowledge repo"
+else bad "agent_log writes into the knowledge repo" "probe entry not found"; fi
+root_after=0
+[[ -f logs/agent_audit.log ]] && root_after="$(wc -l < logs/agent_audit.log | tr -d ' ')"
+[[ "$root_after" -eq 0 ]] && ok "still no audit entries in the ROOT repo after activity" \
+                          || bad "still no audit entries in the ROOT repo after activity" "$root_after entries"
+
+# --- wrap-up's push step must never leave log data uncommitted -----------
+# A locally-spawned project has no remote until `gh repo create` runs, so
+# push-logs is EXPECTED to report a failed push here -- and it does, honestly:
+# "logs are committed locally but NOT pushed". What must never happen is log
+# data left sitting uncommitted, which is how a session's record gets lost.
+bash scripts/utils/push-logs.sh >/dev/null 2>&1 || true
+leftover="$(git -C "$KNOW" status --porcelain 2>/dev/null | head -5 || true)"
+if [[ -z "$leftover" ]]; then
+    ok "push-logs.sh leaves nothing uncommitted in the knowledge repo"
+else
+    bad "push-logs.sh leaves nothing uncommitted in the knowledge repo" \
+        "still dirty: $(echo $leftover | cut -c1-60)"
+fi
+
+# --- Other spawn shapes ---------------------------------------------------
+# The deep pass above covers one shape: --copy-to, engine claude, no child
+# repos. These are the other documented ways to spawn, each asserted on the
+# thing that makes it different. Lighter than the deep pass on purpose --
+# the point is that the shape works at all, which nothing checked before.
+echo ""
+echo "  -- other spawn shapes --"
+
+shape() {   # shape <name> <extra init args...>
+    local name="$1"; shift
+    ( cd "$ARCHETYPE_DIR" && GH_CONFIG_DIR="$SANDBOX/no-gh" \
+        timeout 300 bash init-project.sh "$name" --copy-to "$SANDBOX/$name" "$@" \
+    ) >"$SANDBOX/$name.log" 2>&1
+}
+
+# engine codex: keeps CODEX.md, drops CLAUDE.md, and its validators still pass
+if shape codexproj --engine codex; then
+    ok "spawn --engine codex exits 0"
+    [[ -f "$SANDBOX/codexproj/CODEX.md" ]] && ok "codex spawn keeps CODEX.md" \
+        || bad "codex spawn keeps CODEX.md" "missing"
+    [[ ! -f "$SANDBOX/codexproj/CLAUDE.md" ]] && ok "codex spawn drops CLAUDE.md" \
+        || bad "codex spawn drops CLAUDE.md" "still present"
+    if ( cd "$SANDBOX/codexproj" && python3 scripts/validate/validate_claude_md_consistency.py >/dev/null 2>&1 ); then
+        ok "codex spawn passes instruction-file consistency"
+    else bad "codex spawn passes instruction-file consistency" "non-zero exit"; fi
+else
+    bad "spawn --engine codex exits 0" "see $SANDBOX/codexproj.log"
+fi
+
+# --guided: leaves the marker the init wizard keys off
+if shape guidedproj --guided; then
+    ok "spawn --guided exits 0"
+    [[ -f "$SANDBOX/guidedproj/.needs-init" ]] && ok "--guided leaves the .needs-init marker" \
+        || bad "--guided leaves the .needs-init marker" "missing — the wizard will never trigger"
+else
+    bad "spawn --guided exits 0" "see $SANDBOX/guidedproj.log"
+fi
+
+# --repos: registers a child repo alongside the knowledge repo
+CHILD="$SANDBOX/childlib"
+mkdir -p "$CHILD"
+( cd "$CHILD" && git init -q . && git commit -q --allow-empty -m init ) >/dev/null 2>&1
+if shape reposproj --repos "childlib:$CHILD"; then
+    ok "spawn --repos exits 0"
+    [[ -d "$SANDBOX/reposproj/repos/childlib" ]] && ok "--repos links the child repo" \
+        || bad "--repos links the child repo" "repos/childlib missing"
+    if jq -e '[.repos[].name] | index("childlib") and index("reposproj-knowledge")' \
+         "$SANDBOX/reposproj/repos/repos.json" >/dev/null 2>&1; then
+        ok "--repos registers child and knowledge repos together"
+    else
+        bad "--repos registers child and knowledge repos together" \
+            "repos.json: $(jq -c '[.repos[].name]' "$SANDBOX/reposproj/repos/repos.json" 2>/dev/null)"
+    fi
+else
+    bad "spawn --repos exits 0" "see $SANDBOX/reposproj.log"
+fi
+
+# in-place: the documented default (clone the archetype, init inside it)
+INPLACE="$SANDBOX/inplace"
+mkdir -p "$INPLACE"
+tar -C "$ARCHETYPE_DIR" --exclude=.git -cf - . 2>/dev/null | tar -C "$INPLACE" -xf - 2>/dev/null
+( cd "$INPLACE" && git init -q . && git add -A && git commit -q -m base ) >/dev/null 2>&1
+if ( cd "$INPLACE" && GH_CONFIG_DIR="$SANDBOX/no-gh" timeout 300 bash init-project.sh inplaceproj ) \
+     >"$SANDBOX/inplace.log" 2>&1; then
+    ok "in-place spawn (no --copy-to) exits 0"
+    [[ -d "$INPLACE/repos/inplaceproj-knowledge" ]] \
+        && ok "in-place spawn creates its knowledge repo" \
+        || bad "in-place spawn creates its knowledge repo" "missing"
+else
+    bad "in-place spawn (no --copy-to) exits 0" "see $SANDBOX/inplace.log"
+fi
 
 echo ""
 echo "=== $PASS passed, $FAIL failed"
