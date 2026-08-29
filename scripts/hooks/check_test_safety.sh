@@ -39,7 +39,12 @@ fi
 
 # Check for pytest -n N where N > MAX_WORKERS
 if echo "$COMMAND" | grep -qP "pytest.*-n\s+(\d+)"; then
-    N=$(echo "$COMMAND" | grep -oP "(?<=-n\s)\d+" | head -1)
+    # `|| true`: the enclosing test matches `-n\s+` (one or more spaces) while
+    # this lookbehind is fixed-width and only matches one, so `pytest -n  4`
+    # satisfies the `if` and finds nothing here -- grep exits 1, pipefail
+    # promotes it, and the hook dies instead of blocking the run.
+    # The `-n "$N"` test below already handles an empty result.
+    N=$(echo "$COMMAND" | grep -oP -- "-n\s+\K\d+" | head -1 || true)
     if [[ -n "$N" && "$N" -gt "$MAX_WORKERS" ]]; then
         echo "BLOCKED: 'pytest -n ${N}' exceeds max workers (${MAX_WORKERS})."
         echo "Use 'pytest -n ${MAX_WORKERS}' or fewer."

@@ -20,7 +20,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)}"
 source "$PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
-trap 'hook_fail_open "wiki-recall" "unexpected error"' ERR
+# Report where it failed. "unexpected error" alone kept this hook failing open
+# six times across eight days in a downstream project with nothing to chase --
+# the trap discarded the one fact needed to fix it.
+trap 'hook_fail_open "wiki-recall" "line $LINENO: $BASH_COMMAND"' ERR
 
 # Hooks inherit a minimal PATH that omits the user-local bin directories, so a
 # tool installed there is invisible and the hook silently takes its fallback
@@ -82,6 +85,7 @@ if command -v colgrep &>/dev/null; then
   QUERY="$(printf '%s ' "${TERMS[@]}")"
   (cd "$WIKI_DIR" && timeout 6 colgrep "$QUERY" . -k 5 -l 2>/dev/null || true) \
     | grep -E '\.md$' \
+    | grep -Ev '(^|/)(INDEX|STALENESS|USAGE|schema|README)\.md$' \
     | awk '{ print 1000 - NR, $0 }' > "$SCORED" 2>/dev/null || true
 fi
 
@@ -139,7 +143,11 @@ for REL in "${TOP[@]}"; do
   hook_dedup_check "$KEY" || continue
 
   FILE="$WIKI_DIR/$REL"
-  TITLE="$(grep -m1 '^title:' "$FILE" 2>/dev/null | sed 's/^title: *//; s/^"//; s/"$//')"
+  # `|| true`: grep exits 1 when a file has no `title:` line, and under
+  # `set -o pipefail` that fails the assignment and trips the ERR trap, failing
+  # the hook open. The next line already handles an empty TITLE, so the
+  # not-found case was always meant to be survivable.
+  TITLE="$(grep -m1 '^title:' "$FILE" 2>/dev/null | sed 's/^title: *//; s/^"//; s/"$//' || true)"
   [[ -n "$TITLE" ]] || TITLE="$(basename "$REL" .md)"
 
   FACTS="$(extract_facts "$FILE" 2>/dev/null || true)"
