@@ -10,7 +10,7 @@ Session logging produces an append-only audit trail at `logs/audit/<user>/`. `sc
 
 Pushing logs back to main uses `scripts/utils/push-logs.sh`: a git-worktree + lockfile pattern that lets a session push log/note changes to `origin/main` without bypassing branch protection. The script creates a temporary worktree from `origin/main`, rsyncs the local log/note tree into it, commits, and pushes. The worktree is cleaned up after each run; stale-worktree detection via `git worktree prune` handles cross-environment paths (host vs container).
 
-Session-start and session-end hooks write logs/notes to the configured log repo (`--log-repo` flag at init) with fallback to project root, supporting both single-repo (legacy) and split-mode layouts.
+Session-start and session-end hooks write logs/notes to the configured knowledge repo (`--knowledge-repo` flag at init) with fallback to project root, supporting both single-repo (legacy) and split-mode layouts.
 
 ## Key Points
 

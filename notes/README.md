@@ -1,19 +1,19 @@
 # Notes
 
 This directory is a **stub** in the root governance repo. Per-user notes,
-handoffs, plans, and facts live in the **log repo**.
+handoffs, plans, and facts live in the **knowledge repo**.
 
-## Where is the log repo?
+## Where is the knowledge repo?
 
 ```bash
 jq -r '.log_repo_name' .archetype-manifest.json
 # Then look in repos/<name>/notes/
 ```
 
-## Log repo notes structure
+## Knowledge repo notes structure
 
 ```
-<log-repo>/notes/
+<knowledge-repo>/notes/
 ├── <username>/
 │   ├── plans/             # Session plans and design documents
 │   ├── handoffs/          # Work handoff documents

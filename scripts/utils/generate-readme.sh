@@ -54,7 +54,7 @@ if [[ -d repos ]]; then
     done
 fi
 
-# --- Check wiki state (the compiled wiki lives in the log repo) ---
+# --- Check wiki state (the compiled wiki lives in the knowledge repo) ---
 WIKI_STATUS="No wiki pages compiled yet."
 if [[ -d "repos/${LOG_REPO_NAME}/wiki" ]]; then
     wiki_count="$(find "repos/${LOG_REPO_NAME}/wiki" -name '*.md' -not -name 'INDEX.md' -not -name 'STALENESS.md' -not -name 'README.md' -not -name 'schema.md' -not -name 'USAGE.md' 2>/dev/null | wc -l)"
@@ -63,7 +63,7 @@ if [[ -d "repos/${LOG_REPO_NAME}/wiki" ]]; then
     fi
 fi
 
-# --- Check log repo state ---
+# --- Check knowledge repo state ---
 LOG_REPO_STATUS=""
 LOG_REPO_DIR=""
 if [[ -d "repos/${LOG_REPO_NAME}" ]]; then
@@ -148,11 +148,15 @@ ${REPO_TABLE:-| *(none yet)* | — | — |}
 \`\`\`
 ├── AGENT.md               # Engine-neutral agent instructions (primary)
 ├── MAINTAINERS.json       # Who can modify protected files
+├── HOOKS.lock             # sha256 lock over scripts/hooks/ + scripts/validate/
+├── init-project.sh        # Scaffolds a new governance root from this archetype
 ├── agents/
 │   ├── shared/            # Cross-cutting policy (constraints, standards, workflows)
 │   ├── roles/             # Role overlays (6-section schema per role)
 │   └── prompt-templates/  # Optional prompt snippets copied to local/ at init
 ├── .claude/               # TRACKED: settings, skills (${SKILL_COUNT}), commands
+├── .github/               # CI workflow: server-side protected-path backstop
+├── .devcontainer/         # Reproducible dev container definition
 ├── scripts/
 │   ├── bootstrap.sh       # One-shot setup for a fresh clone (run this first)
 │   ├── hooks/             # Security gates, audit logging (${OPTIONAL_HOOK_COUNT} hooks)
@@ -160,6 +164,8 @@ ${REPO_TABLE:-| *(none yet)* | — | — |}
 │   ├── session/           # Session lifecycle
 │   ├── repos/             # Child repo management
 │   └── utils/             # Logging, analysis, generation
+├── docs/                  # Guides and design notes
+├── templates/             # Seed files copied into new knowledge repos
 ├── logs/                  # Stub — actual data in the knowledge repo
 ├── notes/                 # Stub — actual data in the knowledge repo
 ├── repos/
@@ -182,7 +188,7 @@ only walks \`.\` and \`repos/*/\`. Being ignored also means \`git add -A\` canno
 sweep it into a session PR. Nothing in \`tmp/\` survives a clean checkout; use
 \`local/notes/\` for personal material that should persist.
 
-## Log Repo
+## Knowledge Repo
 
 Session logs, notes, handoffs, and the compiled wiki live in a dedicated
 **knowledge repo** at \`repos/${LOG_REPO_NAME}/\` (the \`log_repo_name\` in
@@ -200,7 +206,7 @@ even when the root repo has required reviews or CI gates.
 | \`notes/<user>/facts.md\` | Cross-session facts cache |
 | \`wiki/<user>/\` | Per-member wiki compilations |
 
-$(if [[ -n "$LOG_REPO_STATUS" ]]; then echo "Current state: ${LOG_REPO_STATUS}."; else echo "Log repo not yet populated."; fi)
+$(if [[ -n "$LOG_REPO_STATUS" ]]; then echo "Current state: ${LOG_REPO_STATUS}."; else echo "Knowledge repo not yet populated."; fi)
 
 ## Hooks
 
@@ -209,7 +215,7 @@ Hooks enforce policy during agent sessions. ${HOOK_COUNT} hooks are wired by def
 | Hook | Trigger | Purpose |
 |------|---------|---------|
 | \`session-start.sh\` | SessionStart | Resolve user, branch, load context |
-| \`session-end.sh\` | SessionEnd | Write progress, push to log repo |
+| \`session-end.sh\` | SessionEnd | Write progress, push to knowledge repo |
 | \`check_secrets_read.sh\` | PreToolUse (Read) | Block reads of protected paths |
 | \`check_filesystem_path.sh\` | PreToolUse (Write) | Prevent writes outside project |
 | \`post-tool-use-audit.sh\` | PostToolUse | Append-only audit trail |

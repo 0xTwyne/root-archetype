@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Register a person's aliases in the log repo's identities.json, and reconcile
+# Register a person's aliases in the knowledge repo's identities.json, and reconcile
 # any per-user directories already created under one of those aliases.
 #
 # Run this once per person, on their first session. It is idempotent.
@@ -50,7 +50,7 @@ done
 
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required." >&2; exit 1; }
 
-# --- Resolve the log repo the way the hooks do ---
+# --- Resolve the knowledge repo the way the hooks do ---
 LOG_NAME=""
 if [[ -f "$ROOT_DIR/.archetype-manifest.json" ]]; then
     LOG_NAME="$(jq -r '.log_repo_name // empty' "$ROOT_DIR/.archetype-manifest.json" 2>/dev/null || echo "")"
@@ -58,7 +58,7 @@ fi
 [[ -n "$LOG_NAME" ]] || { echo "ERROR: no log_repo_name in .archetype-manifest.json" >&2; exit 1; }
 LOG_REPO="$ROOT_DIR/repos/$LOG_NAME"
 [[ -d "$LOG_REPO/.git" ]] || {
-    echo "ERROR: log repo not found at $LOG_REPO" >&2
+    echo "ERROR: knowledge repo not found at $LOG_REPO" >&2
     echo "  Run: bash scripts/bootstrap.sh" >&2
     exit 1
 }
@@ -167,6 +167,6 @@ elif [[ "$APPLY" != "true" ]]; then
 fi
 
 echo ""
-echo "Commit identities.json (and any moves) to the log repo so the rest of the"
+echo "Commit identities.json (and any moves) to the knowledge repo so the rest of the"
 echo "team resolves you the same way:"
 echo "  bash scripts/utils/push-logs.sh"

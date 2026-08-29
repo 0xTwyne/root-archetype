@@ -113,7 +113,7 @@ bash scripts/hooks/session-start.sh --argv json     # JSON
 bash scripts/session/session_init.sh --argv
 ```
 
-Output includes: project dir, log repo dir, planned branch name, planned
+Output includes: project dir, knowledge repo dir, planned branch name, planned
 writes, declared side effects, and the tool audit table. No files are touched,
 no git operations run.
 
@@ -121,7 +121,7 @@ no git operations run.
 
 Every Claude Code tool invocation is logged via `scripts/utils/agent_log.sh`
 to per-user audit files under `logs/audit/<user>/`. Logs are append-only by
-convention; tampering shows up in git diffs of the log repo.
+convention; tampering shows up in git diffs of the knowledge repo.
 
 Session counters (`tool_calls`, `subagents`, `file_modifications`) are
 maintained in `.session-stats` (gitignored) and surfaced to subagents as
@@ -158,7 +158,7 @@ attribute changes to a specific session id.
 ### 11. Per-User Log/Notes Scoping
 
 `hook_ensure_log_dirs <user>` creates `notes/<user>/`, `logs/progress/<user>/`,
-and (if applicable) `wiki/<user>/` in the log repo. Cross-user collision is
+and (if applicable) `wiki/<user>/` in the knowledge repo. Cross-user collision is
 structurally impossible: one agent cannot accidentally overwrite another
 user's notes because the path is namespaced by the hook before the agent ever
 sees it.
