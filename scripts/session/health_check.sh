@@ -10,9 +10,12 @@ PASS=0
 WARN=0
 FAIL=0
 
-check_pass() { echo "  PASS: $1"; ((PASS++)); }
-check_warn() { echo "  WARN: $1"; ((WARN++)); }
-check_fail() { echo "  FAIL: $1"; ((FAIL++)); }
+# Note: `((VAR++))` returns exit status 1 when VAR is 0 (post-increment yields
+# the old value), which aborts the script under `set -e`. Use arithmetic
+# assignment instead.
+check_pass() { echo "  PASS: $1"; PASS=$((PASS + 1)); }
+check_warn() { echo "  WARN: $1"; WARN=$((WARN + 1)); }
+check_fail() { echo "  FAIL: $1"; FAIL=$((FAIL + 1)); }
 
 echo "=== Health Check: $(basename "$REPO_ROOT") ==="
 

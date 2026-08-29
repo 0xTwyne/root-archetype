@@ -100,11 +100,18 @@ generate_claude() {
     cp "$ENGINE_DIR/settings.json.tmpl" "$PROJECT_DIR/.claude/settings.json"
     echo "  .claude/settings.json"
 
-    # 3. Commands
-    if [[ -d "$ENGINE_DIR/commands" ]]; then
+    # 3. Commands — engine-provided first, then project-level ones from
+    #    agents/commands/ (engine-neutral definitions shared across engines).
+    #    Without the second copy, project commands never reach a fresh clone.
+    if [[ -d "$ENGINE_DIR/commands" ]] || [[ -d "$PROJECT_DIR/agents/commands" ]]; then
         mkdir -p "$PROJECT_DIR/.claude/commands"
-        cp "$ENGINE_DIR/commands/"* "$PROJECT_DIR/.claude/commands/" 2>/dev/null || true
-        echo "  .claude/commands/"
+        [[ -d "$ENGINE_DIR/commands" ]] && \
+            cp "$ENGINE_DIR/commands/"*.md "$PROJECT_DIR/.claude/commands/" 2>/dev/null || true
+        [[ -d "$PROJECT_DIR/agents/commands" ]] && \
+            cp "$PROJECT_DIR/agents/commands/"*.md "$PROJECT_DIR/.claude/commands/" 2>/dev/null || true
+        local cmd_count
+        cmd_count="$(find "$PROJECT_DIR/.claude/commands" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+        echo "  .claude/commands/ ($cmd_count commands)"
     fi
 
     # 4. Auto-generate skill wrappers from agents/skills/ frontmatter

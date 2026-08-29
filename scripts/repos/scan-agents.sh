@@ -46,7 +46,9 @@ scan_repo() {
             local sections=0
             for section in "## Mission" "## Use This Role When" "## Inputs Required" "## Outputs" "## Workflow" "## Guardrails"; do
                 if grep -q "^${section}" "$agent_file" 2>/dev/null; then
-                    ((sections++))
+                    # Not ((sections++)): that returns 1 when sections is 0,
+                    # which aborts this script under `set -e`.
+                    sections=$((sections + 1))
                 fi
             done
             local valid=$( [[ $sections -eq 6 ]] && echo "true" || echo "false" )

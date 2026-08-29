@@ -76,6 +76,13 @@ if [[ -f "$AGENT_MD" ]]; then
 fi
 
 # --- Seed agent files if missing (skip for infrastructure repos) ---
+# Resolve the default here rather than inside the heredoc. Note the wording
+# avoids an apostrophe on purpose: a single quote inside a ${VAR:-default}
+# expansion is treated as a quoting character even within double quotes, so the
+# old default ("this repo's purpose") left an unterminated quote — the heredoc
+# died at runtime with "bad substitution" and aborted registration.
+PURPOSE_TEXT="${PURPOSE:-Configure the purpose of this repo.}"
+
 if [[ "$NO_SCAFFOLD" != true ]] && [[ -d "$REPO_PATH" ]]; then
     if [[ ! -f "${REPO_PATH}/CLAUDE.md" ]]; then
         cat > "${REPO_PATH}/CLAUDE.md" << CLAUDE_EOF
@@ -83,7 +90,7 @@ if [[ "$NO_SCAFFOLD" != true ]] && [[ -d "$REPO_PATH" ]]; then
 
 ## Purpose
 
-${PURPOSE:-Configure this repo's purpose.}
+${PURPOSE_TEXT}
 
 ## Code Style
 
@@ -139,6 +146,39 @@ if [[ -x "$DETECT_SCRIPT" ]] && [[ -d "$REPO_PATH" ]]; then
             echo "Auto-detected maintainers for ${REPO_NAME}: $(echo "$EMAILS" | jq -r 'join(", ")')"
         fi
     fi
+fi
+
+# --- Record in repos/repos.json ---
+# repos/ contents are gitignored, so a clone of this root has no child repos.
+# This manifest is the only record of how to get them back; scripts/bootstrap.sh
+# reads it to re-clone them. A repo with no git remote is recorded without a
+# clone_url and is skipped by bootstrap (local-only or symlinked).
+REPOS_MANIFEST="${REPOS_DIR}/repos.json"
+if command -v jq &>/dev/null; then
+    CLONE_URL=""
+    if [[ -d "${REPO_PATH}/.git" ]]; then
+        CLONE_URL="$(git -C "$REPO_PATH" remote get-url origin 2>/dev/null || echo "")"
+    fi
+
+    [[ -f "$REPOS_MANIFEST" ]] || echo '{"repos": []}' > "$REPOS_MANIFEST"
+
+    if jq --arg name "$REPO_NAME" \
+          --arg url "$CLONE_URL" \
+          --arg purpose "$PURPOSE" \
+          '.repos = ((.repos // []) | map(select(.name != $name)) + [{name: $name, clone_url: $url, purpose: $purpose}] | sort_by(.name))' \
+          "$REPOS_MANIFEST" > "${REPOS_MANIFEST}.tmp" 2>/dev/null; then
+        mv "${REPOS_MANIFEST}.tmp" "$REPOS_MANIFEST"
+        if [[ -n "$CLONE_URL" ]]; then
+            echo "Recorded in repos/repos.json (clone_url: ${CLONE_URL})"
+        else
+            echo "Recorded in repos/repos.json (no git remote — bootstrap will skip cloning it)"
+        fi
+    else
+        rm -f "${REPOS_MANIFEST}.tmp"
+        echo "WARNING: could not update repos/repos.json" >&2
+    fi
+else
+    echo "WARNING: jq not found — repos/repos.json not updated (bootstrap.sh cannot re-clone this repo)" >&2
 fi
 
 echo "Repo '${REPO_NAME}' registered."
