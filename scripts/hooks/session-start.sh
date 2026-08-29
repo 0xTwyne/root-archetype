@@ -115,6 +115,16 @@ fi
 ROOT_REPO_NAME="$(jq -r '.template_values.PROJECT_NAME // empty' "$PROJECT_DIR/.archetype-manifest.json" 2>/dev/null || echo "")"
 [[ -z "$ROOT_REPO_NAME" ]] && ROOT_REPO_NAME="$(basename "$PROJECT_DIR")"
 
+# Capture the OUTGOING session before overwriting the identity file.
+# A session killed outright (SIGKILL, closed terminal, host shutdown) never runs
+# its SessionEnd hook, so no amount of hardening inside that hook can produce a
+# close record. The next session start is the only place that still knows the
+# dead session's id — after the write below, it is gone.
+PREV_SESSION_ID=""
+if [[ -f "$PROJECT_DIR/.session-identity" ]]; then
+  PREV_SESSION_ID="$(jq -r '.session_id // empty' "$PROJECT_DIR/.session-identity" 2>/dev/null | tr -d '\r' || echo "")"
+fi
+
 # Write .session-identity (gitignored) — read by all hooks
 jq -cn \
   --arg session_id "$SESSION_ID" \
@@ -225,6 +235,22 @@ fi
 # Log session start
 if [[ -f "$PROJECT_DIR/scripts/utils/agent_log.sh" ]]; then
   source "$PROJECT_DIR/scripts/utils/agent_log.sh"
+
+  # Close out a predecessor that never got to write its own SESSION_END.
+  # Only when it genuinely has a START and no END — never invent a close for a
+  # session the log has no record of starting, and never for ourselves.
+  if [[ -n "$PREV_SESSION_ID" && "$PREV_SESSION_ID" != "$SESSION_ID" ]] \
+     && declare -F agent_session_has_start >/dev/null 2>&1; then
+    if agent_session_has_start "$PREV_SESSION_ID" \
+       && ! agent_session_has_end "$PREV_SESSION_ID"; then
+      # The timestamp is this moment, not the real end — say so in the record
+      # rather than implying a precision the backfill does not have.
+      AGENT_SESSION_ID="$PREV_SESSION_ID" _agent_log "INFO" "SESSION_END" \
+        "Session ended (backfilled at next session start; exact end time unknown)" \
+        "backfilled_by=${SESSION_ID}" || true
+    fi
+  fi
+
   agent_session_start "Session started by $SESSION_USER on branch $BRANCH_NAME"
 fi
 

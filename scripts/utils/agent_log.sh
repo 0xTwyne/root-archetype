@@ -22,7 +22,46 @@ mkdir -p "$_AGENT_LOG_DIR" 2>/dev/null \
     || echo "agent_log: cannot create $_AGENT_LOG_DIR (check ownership/permissions)" >&2
 
 _agent_session_id() {
-    # Return current session ID, creating if stale or missing
+    # The session field must be STABLE from SESSION_START to SESSION_END and
+    # must identify exactly one session. Prefer the real session identity; the
+    # shared marker file is a last resort.
+    #
+    # It used to come only from $_AGENT_SESSION_FILE — one shared, mutable file
+    # with a 4-hour reuse window — which produced two distinct faults:
+    #
+    #   * Two sessions overlapping inside the window read the same file and
+    #     logged under one id.
+    #   * agent_session_end deletes the marker, so a session whose end found it
+    #     missing (a concurrent session's end got there first) or stale minted a
+    #     FRESH id and filed SESSION_END under it — an id with an END and no
+    #     START, while its real id kept a START and no END.
+    #
+    # Downstream, that showed up as 222 SESSION_START against 202 SESSION_END,
+    # which reads as sessions dying before their hook ran. It was not: grouping
+    # by id gave 23 orphan STARTs AND 21 orphan ENDs. Orphans on both sides is
+    # misfiling, not death. 19 ids carried more than one SESSION_START.
+    #
+    # .session-identity is the same source _agent_log already consults below for
+    # repo/branch provenance, so this adds no new dependency.
+    if [[ -n "${AGENT_SESSION_ID:-}" ]]; then
+        printf '%s\n' "${AGENT_SESSION_ID}"
+        return
+    fi
+    if [[ -n "${SESSION_ID:-}" && "${SESSION_ID}" != "unknown" ]]; then
+        printf '%s\n' "${SESSION_ID}"
+        return
+    fi
+    local _ident_root _sid
+    _ident_root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || echo ".")}"
+    if [[ -f "$_ident_root/.session-identity" ]]; then
+        _sid="$(jq -r '.session_id // empty' "$_ident_root/.session-identity" 2>/dev/null | tr -d '\r' || true)"
+        if [[ -n "$_sid" && "$_sid" != "null" ]]; then
+            printf '%s\n' "$_sid"
+            return
+        fi
+    fi
+    # Fallback for callers outside a session (cron, manual scripts), where no
+    # session identity exists. Same shape as before.
     if [[ -f "$_AGENT_SESSION_FILE" ]]; then
         local age_s
         age_s=$(( $(date +%s) - $(stat -c %Y "$_AGENT_SESSION_FILE" 2>/dev/null || echo 0) ))
@@ -32,8 +71,32 @@ _agent_session_id() {
         fi
     fi
     local sid="ses_$(date +%Y%m%d_%H%M%S)_$$"
-    echo "$sid" > "$_AGENT_SESSION_FILE"
+    echo "$sid" > "$_AGENT_SESSION_FILE" 2>/dev/null || true
     echo "$sid"
+}
+
+# True when the session id already carries an entry of the given category.
+# Two greps rather than one fused literal: matching
+# `"session":"X","level":"INFO","cat":"Y"` in one pattern silently depends on
+# those keys staying adjacent and in that order. This file already emits eight
+# fields and has gained some over time, so that assumption is a live hazard —
+# a reordering would make the predicate answer "no" for every session and
+# quietly invert both the idempotency and backfill guards.
+_agent_session_has_cat() {
+    local sid="$1" cat="$2"
+    [[ -f "$_AGENT_LOG_FILE" ]] || return 1
+    grep -F "\"session\":\"${sid}\"" "$_AGENT_LOG_FILE" 2>/dev/null \
+        | grep -Fq "\"cat\":\"${cat}\""
+}
+
+# True when the given session id already has a SESSION_END in the audit log.
+agent_session_has_end() {
+    _agent_session_has_cat "${1:?agent_session_has_end requires a session id}" "SESSION_END"
+}
+
+# True when the given session id has a SESSION_START in the audit log.
+agent_session_has_start() {
+    _agent_session_has_cat "${1:?agent_session_has_start requires a session id}" "SESSION_START"
 }
 
 _agent_log() {
@@ -73,7 +136,20 @@ _agent_log() {
 # --- Public API ---
 
 agent_session_start() { _agent_log "INFO" "SESSION_START" "${1:-Session started}"; }
-agent_session_end()   { _agent_log "INFO" "SESSION_END" "${1:-Session ended}"; rm -f "$_AGENT_SESSION_FILE"; }
+# Idempotent: a second SESSION_END for a session that already has one would
+# turn a duplicated hook invocation into a fake extra session. Returns 0 either
+# way so a `set -e` caller (session-end.sh) can never abort on it.
+agent_session_end() {
+    local sid
+    sid="$(_agent_session_id)"
+    if agent_session_has_end "$sid"; then
+        rm -f "$_AGENT_SESSION_FILE" 2>/dev/null || true
+        return 0
+    fi
+    AGENT_SESSION_ID="$sid" _agent_log "INFO" "SESSION_END" "${1:-Session ended}" || true
+    rm -f "$_AGENT_SESSION_FILE" 2>/dev/null || true
+    return 0
+}
 
 agent_task_start()    { _agent_log "INFO" "TASK_START" "$1" "${2:-}"; }
 agent_task_end()      { _agent_log "INFO" "TASK_END" "$1" "${2:-success}"; }
