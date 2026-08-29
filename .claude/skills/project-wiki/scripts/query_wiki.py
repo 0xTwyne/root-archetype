@@ -207,7 +207,7 @@ def main() -> int:
     log_root = _log_repo_root()
 
     def _research_path(rel: str) -> Path:
-        preferred = log_root / "research" / rel
+        preferred = log_root / "wiki" / "research" / rel
         legacy = ROOT / "knowledge" / "research" / rel
         return preferred if preferred.exists() or not legacy.exists() else legacy
 

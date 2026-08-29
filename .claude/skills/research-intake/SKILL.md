@@ -28,17 +28,17 @@ repo path from `.archetype-manifest.json` (`log_repo_name`) via `repos/<name>`.
 - Per-user index → `<log-repo>/notes/<user>/research/intake_index.yaml`
 
 Maintainers promote research to the master database
-(`<knowledge-repo>/research/`) during master wiki compilation
+(`<knowledge-repo>/wiki/research/`) during master wiki compilation
 (`/project-wiki compile --master`).
 
-The knowledge repo's `research/intake_index.yaml` and `research/deep-dives/`
+The knowledge repo's `wiki/research/intake_index.yaml` and `wiki/research/deep-dives/`
 are the **curated master** — only updated by maintainer promotion, not by
 individual intake. (Legacy location, pre-2026-08-29: root `knowledge/research/`.)
 
 ## Workflow
 
 1. **Fetch** — Retrieve the source content (URL, file, or user-provided text)
-2. **Dedup** — Check `<log-repo>/notes/<user>/research/intake_index.yaml` for existing entries with the same URL or title. Also check the master index at `<knowledge-repo>/research/intake_index.yaml`.
+2. **Dedup** — Check `<log-repo>/notes/<user>/research/intake_index.yaml` for existing entries with the same URL or title. Also check the master index at `<knowledge-repo>/wiki/research/intake_index.yaml`.
 3. **Score** — Assess relevance to project using `<knowledge-repo>/wiki/taxonomy.yaml` categories
 4. **Extract** — Summarize key findings, decisions, or data points
 5. **Categorize** — Map to taxonomy categories; propose new categories if none fit
@@ -86,4 +86,4 @@ individual intake. (Legacy location, pre-2026-08-29: root `knowledge/research/`.
 - Set `actioned: false` on new entries; the project-wiki lint pass flags un-actioned entries
 - Confidence level `external` means the finding hasn't been validated against project code
 - Deep-dive files are append-only; update the index entry rather than editing deep-dives
-- Never write directly to `<knowledge-repo>/research/` — that's the maintainer-curated master. Individual intake always goes to `<log-repo>/notes/<user>/research/`
+- Never write directly to `<knowledge-repo>/wiki/research/` — that's the maintainer-curated master. Individual intake always goes to `<log-repo>/notes/<user>/research/`

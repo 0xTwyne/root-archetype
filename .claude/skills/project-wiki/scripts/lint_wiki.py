@@ -321,13 +321,13 @@ def main() -> int:
         completed_dir = ROOT / paths_cfg["completed_handoffs"]
     else:
         completed_dir = _handoff_dirs("completed")
-    # The intake index lives in the knowledge repo (research/intake_index.yaml)
+    # The intake index lives in the knowledge repo (wiki/research/)
     # as of 2026-08-29; the legacy root-repo location (knowledge/research/) is
     # honoured as a fallback so live projects keep linting until they migrate.
     if "intake_index" in paths_cfg:
         index_path = ROOT / paths_cfg["intake_index"]
     else:
-        index_path = _log_repo_root() / "research" / "intake_index.yaml"
+        index_path = _log_repo_root() / "wiki" / "research" / "intake_index.yaml"
         if not index_path.exists():
             legacy = ROOT / "knowledge" / "research" / "intake_index.yaml"
             if legacy.exists():

@@ -159,7 +159,7 @@ else
     # taxonomy.yaml is excluded WITH the rest of knowledge/ since 2026-08-29 —
     # the project's copy is seeded into the knowledge repo from templates/.
     for keep in "templates/log-repo/wiki/taxonomy.yaml" \
-                "templates/log-repo/research/intake_index.yaml" \
+                "templates/log-repo/wiki/research/intake_index.yaml" \
                 "scripts/hooks/session-end.sh" "AGENT.md"; do
         if printf '%s' "$keep" | grep -qE "$REGEX"; then
             bad "wrongly excludes $keep"

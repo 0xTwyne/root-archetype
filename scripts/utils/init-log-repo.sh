@@ -49,7 +49,6 @@ mkdir -p "$LOG_REPO_PATH/logs/audit" \
          "$LOG_REPO_PATH/logs/progress" \
          "$LOG_REPO_PATH/logs/skills" \
          "$LOG_REPO_PATH/notes/handoffs" \
-         "$LOG_REPO_PATH/research/deep-dives" \
          "$LOG_REPO_PATH/wiki"
 
 touch "$LOG_REPO_PATH/logs/.gitkeep" \
@@ -58,7 +57,6 @@ touch "$LOG_REPO_PATH/logs/.gitkeep" \
       "$LOG_REPO_PATH/logs/skills/.gitkeep" \
       "$LOG_REPO_PATH/notes/.gitkeep" \
       "$LOG_REPO_PATH/notes/handoffs/.gitkeep" \
-      "$LOG_REPO_PATH/research/deep-dives/.gitkeep" \
       "$LOG_REPO_PATH/wiki/.gitkeep" 2>/dev/null || true
 
 # --- Seed wiki schema, index builder, and facts cache ---
@@ -72,6 +70,11 @@ for _c in "${WIKI_CATEGORIES[@]}"; do
     mkdir -p "$LOG_REPO_PATH/wiki/$_c"
     touch "$LOG_REPO_PATH/wiki/$_c/.gitkeep" 2>/dev/null || true
 done
+# Master research intake nests inside the wiki's research category — matching
+# the live deployments (sangha-knowledge, twyne-knowledge), whose only
+# top-level data dirs are logs/, notes/ and wiki/.
+mkdir -p "$LOG_REPO_PATH/wiki/research/deep-dives"
+touch "$LOG_REPO_PATH/wiki/research/deep-dives/.gitkeep" 2>/dev/null || true
 
 ARCHETYPE_DIR="${ARCHETYPE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
 TEMPLATE_DIR="$ARCHETYPE_DIR/templates/log-repo"
@@ -100,7 +103,7 @@ copy_required "$TEMPLATE_DIR/scripts/build-indexes.sh" "$LOG_REPO_PATH/scripts/b
 copy_required "$TEMPLATE_DIR/wiki/schema.md"           "$LOG_REPO_PATH/wiki/schema.md"           || COPY_FAILED=1
 copy_required "$TEMPLATE_DIR/wiki/README.md"           "$LOG_REPO_PATH/wiki/README.md"           || COPY_FAILED=1
 copy_required "$TEMPLATE_DIR/wiki/taxonomy.yaml"        "$LOG_REPO_PATH/wiki/taxonomy.yaml"       || COPY_FAILED=1
-copy_required "$TEMPLATE_DIR/research/intake_index.yaml" "$LOG_REPO_PATH/research/intake_index.yaml" || COPY_FAILED=1
+copy_required "$TEMPLATE_DIR/wiki/research/intake_index.yaml" "$LOG_REPO_PATH/wiki/research/intake_index.yaml" || COPY_FAILED=1
 [[ "$COPY_FAILED" -eq 0 ]] || { echo "ERROR: log repo is incomplete — aborting rather than shipping a broken one." >&2; exit 1; }
 
 # AGENT.md — the rules for writing to and pushing this repo. A log repo without

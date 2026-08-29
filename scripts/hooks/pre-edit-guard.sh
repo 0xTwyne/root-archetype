@@ -76,7 +76,7 @@ fi
 if [[ "$IN_ROOT_REPO" == "true" && "$_LOG_DIR" != "$PROJECT_DIR" ]]; then
   case "$REL_PATH" in
     knowledge/*)
-      hook_block "BLOCKED: root knowledge/ is retired in split mode. Taxonomy: ${_LOG_DIR}/wiki/taxonomy.yaml; research: ${_LOG_DIR}/research/; wiki: ${_LOG_DIR}/wiki/."
+      hook_block "BLOCKED: root knowledge/ is retired in split mode. Taxonomy: ${_LOG_DIR}/wiki/taxonomy.yaml; research: ${_LOG_DIR}/wiki/research/; wiki: ${_LOG_DIR}/wiki/."
       ;;
   esac
 fi
