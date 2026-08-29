@@ -4,8 +4,6 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)}"
 source "$PROJECT_DIR/scripts/hooks/lib/hook-utils.sh" 2>/dev/null || true
 
-set -euo pipefail
-
 # Hook: SessionEnd
 # 1. Log SESSION_END to audit trail
 # 2. Push logs/notes directly to main (append-only, no PR friction)
@@ -13,14 +11,31 @@ set -euo pipefail
 # 4. Commit and push session branch
 # 5. Create PR if substantive changes
 
-hook_load_identity
+# --- SESSION_END FIRST, before `set -e` can make anything else fatal. --------
+# The close record is the one thing this hook must not lose, and it depends on
+# none of the work below it. Everything after — push-logs, the branch commit,
+# the PR — may legitimately fail on a given machine; none of those failures may
+# cost the audit trail its END. So `set -euo pipefail` now comes AFTER this
+# block rather than before it, and each step here is individually tolerated.
+#
+# Previously an error anywhere between `set -e` and the emission (identity
+# load, log-repo resolution, sourcing the logger) took the close record with it,
+# silently — a SessionEnd hook runs after the last thing anyone was watching.
+#
+# agent_session_end is idempotent and returns 0 unconditionally, so a duplicate
+# SessionEnd invocation cannot manufacture a second session either.
+hook_load_identity 2>/dev/null || true
 hook_resolve_log_repo 2>/dev/null || true
 
-# Log session end
 if [[ -f "$PROJECT_DIR/scripts/utils/agent_log.sh" ]]; then
-  source "$PROJECT_DIR/scripts/utils/agent_log.sh"
-  agent_session_end "Session ended for $SESSION_USER"
+  # shellcheck source=/dev/null
+  source "$PROJECT_DIR/scripts/utils/agent_log.sh" 2>/dev/null || true
+  if declare -F agent_session_end >/dev/null 2>&1; then
+    agent_session_end "Session ended for ${SESSION_USER:-unknown}" || true
+  fi
 fi
+
+set -euo pipefail
 
 
 # --- Write per-user progress report (to log repo) ---
