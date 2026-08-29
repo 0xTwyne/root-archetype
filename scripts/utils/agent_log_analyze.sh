@@ -49,9 +49,14 @@ case "${1:---summary}" in
     --sessions)
         echo -e "${BLUE}=== Sessions ===${NC}"
         jq -r '.session' "$LOG_FILE" | sort -u | while read -r sid; do
-            count=$(grep -c "\"${sid}\"" "$LOG_FILE")
-            first=$(grep "\"${sid}\"" "$LOG_FILE" | head -1 | jq -r '.ts')
-            last=$(grep "\"${sid}\"" "$LOG_FILE" | tail -1 | jq -r '.ts')
+            # `grep -c` exits 1 on a zero count, and a grep in a pipeline
+            # exits 1 on no match -- pipefail promotes either to fatal. The sid
+            # normally came from this same file so it must match, but a record
+            # with a null .session yields the literal sid "null", which matches
+            # nothing and would abort the whole listing.
+            count=$(grep -c "\"${sid}\"" "$LOG_FILE" || true)
+            first=$(grep "\"${sid}\"" "$LOG_FILE" | head -1 | jq -r '.ts' || true)
+            last=$(grep "\"${sid}\"" "$LOG_FILE" | tail -1 | jq -r '.ts' || true)
             echo "${sid}: ${count} entries (${first} → ${last})"
         done
         ;;
