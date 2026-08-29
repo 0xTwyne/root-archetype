@@ -166,7 +166,7 @@ bash scripts/build-indexes.sh
 
 #### Step 4: Update Taxonomy
 
-Review `knowledge/taxonomy.yaml`. If compilation revealed categories that
+Review `repos/$LOG_REPO/wiki/taxonomy.yaml`. If compilation revealed categories that
 don't fit existing ones, append them under `categories:` with a description.
 
 #### Step 5: Regenerate Handoff Index
@@ -184,7 +184,7 @@ python3 .claude/skills/project-wiki/scripts/compile_sources.py --touch
 
 Or manually:
 ```bash
-date -u +%Y-%m-%dT%H:%M:%SZ > knowledge/research/.last_compile
+date -u +%Y-%m-%dT%H:%M:%SZ > repos/$LOG_REPO/.last_compile
 ```
 
 #### Compilation Principles
@@ -256,6 +256,6 @@ flag while leaving the article wrong, which is worse than leaving it flagged.
 
 - Lint only reports — does NOT auto-fix.
 - Query synthesizes from existing KB — does NOT fetch external information.
-- Compile reads user streams from the knowledge repo (`repos/$LOG_REPO/`) and writes the compiled wiki back into the same repo, at `repos/$LOG_REPO/wiki/`. Root-level `knowledge/wiki/` is cloner-facing reference documentation about the governance scaffold itself — a different artifact for a different reader, and never a compilation target. `knowledge/taxonomy.yaml` and `knowledge/research/` also stay in root.
+- Compile reads user streams from the knowledge repo (`repos/$LOG_REPO/`) and writes the compiled wiki back into the same repo, at `repos/$LOG_REPO/wiki/`. The taxonomy (`wiki/taxonomy.yaml`), research intake (`wiki/research/`) and compile watermark (`.last_compile`) live there too as of 2026-08-29 — matching the live deployments, whose only top-level data dirs are `logs/`, `notes/` and `wiki/`. A root-level `knowledge/` directory exists only in the archetype itself (its own internal KB, never copied into projects) and, as a legacy fallback, in projects that have not migrated yet.
 - `INDEX.md` and `STALENESS.md` are generated. Never hand-edit them — run `bash scripts/build-indexes.sh` instead, which delegates to the knowledge repo's own builder.
 - Scaling thresholds in `wiki.yaml` are advisory only.

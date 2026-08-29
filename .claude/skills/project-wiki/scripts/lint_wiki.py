@@ -321,14 +321,17 @@ def main() -> int:
         completed_dir = ROOT / paths_cfg["completed_handoffs"]
     else:
         completed_dir = _handoff_dirs("completed")
-    # The intake index is one of the few knowledge artifacts that stays in the
-    # ROOT repo: knowledge/research/ did not move at the April 2026 split, only
-    # knowledge/wiki/ did. The default was "research/intake_index.yaml" relative
-    # to root, which resolved to a path that has never existed — and pass 4
-    # returns silently when the file is absent, so the un-actioned-intake check
-    # reported zero issues for its entire life rather than reporting that it
-    # could not run.
-    index_path = ROOT / paths_cfg.get("intake_index", "knowledge/research/intake_index.yaml")
+    # The intake index lives in the knowledge repo (wiki/research/)
+    # as of 2026-08-29; the legacy root-repo location (knowledge/research/) is
+    # honoured as a fallback so live projects keep linting until they migrate.
+    if "intake_index" in paths_cfg:
+        index_path = ROOT / paths_cfg["intake_index"]
+    else:
+        index_path = _log_repo_root() / "wiki" / "research" / "intake_index.yaml"
+        if not index_path.exists():
+            legacy = ROOT / "knowledge" / "research" / "intake_index.yaml"
+            if legacy.exists():
+                index_path = legacy
     index_patterns = lint_cfg.get("index_patterns", ["*-index.md"])
 
     # No active handoffs is a normal state, not a failure. Treating the empty

@@ -1,0 +1,4 @@
+# Research intake index — one entry per ingested source.
+# Written by the research-intake skill; linted by project-wiki (pass 4:
+# un-actioned intake). Lives in the knowledge repo alongside deep-dives/.
+entries: []

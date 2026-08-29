@@ -103,7 +103,8 @@ rm -rf "$D"
 echo "=== 5. guard BLOCKS root stub writes in split mode ==="
 D="$(new_split_sandbox)"
 for p in "logs/progress/tester/x.md" "notes/tester/handoffs/active/x.md" \
-         "notes/handoffs/INDEX.md" "logs/progress/INDEX.md"; do
+         "notes/handoffs/INDEX.md" "logs/progress/INDEX.md" \
+         "knowledge/taxonomy.yaml" "knowledge/research/deep-dives/x.md"; do
     edit_input "$D/$p" | CLAUDE_PROJECT_DIR="$D" bash "$D/scripts/hooks/pre-edit-guard.sh" >/dev/null 2>&1
     rc=$?
     [[ "$rc" == "2" ]] && ok "root $p blocked (exit 2)" \
@@ -131,9 +132,11 @@ rm -rf "$D"
 echo "=== 8. single-repo mode: root logs/ writes are not blocked ==="
 D="$(new_split_sandbox)"
 rm "$D/.archetype-manifest.json"
-edit_input "$D/logs/progress/tester/x.md" | CLAUDE_PROJECT_DIR="$D" bash "$D/scripts/hooks/pre-edit-guard.sh" >/dev/null 2>&1
-rc=$?
-[[ "$rc" == "0" ]] && ok "single-repo root write allowed" || bad "blocked in single-repo mode (exit $rc)"
+for p in "logs/progress/tester/x.md" "knowledge/taxonomy.yaml"; do
+    edit_input "$D/$p" | CLAUDE_PROJECT_DIR="$D" bash "$D/scripts/hooks/pre-edit-guard.sh" >/dev/null 2>&1
+    rc=$?
+    [[ "$rc" == "0" ]] && ok "single-repo root $p allowed" || bad "single-repo $p blocked (exit $rc)"
+done
 rm -rf "$D"
 
 echo "=== 9. init copy-mode exclusion covers the instance-data leak ==="
@@ -144,6 +147,7 @@ else
     for leak in "knowledge/wiki/skills-framework.md" \
                 "knowledge/research/deep-dives/some-topic.md" \
                 "knowledge/research/intake_index.yaml" \
+                "knowledge/taxonomy.yaml" \
                 ".promoted-sources" "notes/handoffs/INDEX.md" \
                 "logs/progress/someone/2026-01-01.md" "logs/audit/someone/x.jsonl"; do
         if printf '%s' "$leak" | grep -qE "$REGEX"; then
@@ -152,7 +156,11 @@ else
             bad "COPIES $leak into spawned projects"
         fi
     done
-    for keep in "knowledge/taxonomy.yaml" "scripts/hooks/session-end.sh" "AGENT.md"; do
+    # taxonomy.yaml is excluded WITH the rest of knowledge/ since 2026-08-29 —
+    # the project's copy is seeded into the knowledge repo from templates/.
+    for keep in "templates/log-repo/wiki/taxonomy.yaml" \
+                "templates/log-repo/wiki/research/intake_index.yaml" \
+                "scripts/hooks/session-end.sh" "AGENT.md"; do
         if printf '%s' "$keep" | grep -qE "$REGEX"; then
             bad "wrongly excludes $keep"
         else

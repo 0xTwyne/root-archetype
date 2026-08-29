@@ -68,6 +68,19 @@ if [[ -n "$REL_PATH" ]]; then
   esac
 fi
 
+# Root knowledge/ no longer exists in split-mode projects — taxonomy, research
+# and the compiled wiki all live in the knowledge repo. A write there is a
+# stale-path mistake, not a choice. (Single-repo mode, e.g. the archetype
+# itself, keeps root knowledge/ as its own KB and is untouched: _LOG_DIR ==
+# PROJECT_DIR there, so this never fires.)
+if [[ "$IN_ROOT_REPO" == "true" && "$_LOG_DIR" != "$PROJECT_DIR" ]]; then
+  case "$REL_PATH" in
+    knowledge/*)
+      hook_block "BLOCKED: root knowledge/ is retired in split mode. Taxonomy: ${_LOG_DIR}/wiki/taxonomy.yaml; research: ${_LOG_DIR}/wiki/research/; wiki: ${_LOG_DIR}/wiki/."
+      ;;
+  esac
+fi
+
 if [[ "$IS_LOG_PATH" == "true" ]]; then
   # In split mode, BLOCK writes to the root repo's skeletal stubs — before any
   # exemption, so the shared files (INDEX.md, notes/handoffs/*) are covered too:

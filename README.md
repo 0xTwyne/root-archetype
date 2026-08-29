@@ -66,12 +66,12 @@ hook selection, knowledge seeding, and role customization interactively.
 │   └── utils/             # Logging, analysis, generation
 ├── docs/                  # Guides and design notes
 ├── templates/             # Seed files copied into new knowledge repos
-├── knowledge/             # Archetype-internal KB — never copied into spawned
-│                          #   projects except taxonomy.yaml (see init-project.sh)
+├── knowledge/             # Archetype-internal KB — never copied into
+│                          #   spawned projects (see init-project.sh)
 ├── logs/                  # Stub — actual data in the knowledge repo
 ├── notes/                 # Stub — actual data in the knowledge repo
 ├── repos/
-│   ├── <project>-knowledge/  # Knowledge repo (logs, notes, handoffs, compiled wiki)
+│   ├── <project>-knowledge/  # Knowledge repo (logs, notes, handoffs, research, compiled wiki + taxonomy)
 │   └── <child-repo>/      # Registered application repos (symlink or physical)
 ├── secrets/               # Protected paths (contents gitignored)
 ├── local/                 # Per-machine customization (gitignored)
@@ -196,7 +196,7 @@ data, and data lives where every team member can push.
                          v
 ┌─────────────────────────────┐
 │ wiki/                       │  compiled articles + INDEX.md + STALENESS.md
-│ (same repo, shared by all)  │  categories from knowledge/taxonomy.yaml (root)
+│ (same repo, shared by all)  │  categories from wiki/taxonomy.yaml (same repo)
 └─────────────────────────────┘
 ```
 
@@ -208,8 +208,8 @@ data, and data lives where every team member can push.
 
 [`knowledge/wiki/`](knowledge/wiki/) is reference documentation about
 root-archetype itself, for anyone cloning it to build a new root repo. It is
-**archetype-internal**: `init-project.sh` excludes it (and everything else under
-`knowledge/` except `taxonomy.yaml`) from spawned projects, so this directory is
+**archetype-internal**: `init-project.sh` excludes `knowledge/` in its entirety
+from spawned projects (their taxonomy is seeded into the knowledge repo), so it is
 also a safe home for progress and handoffs on archetype development. Each page
 indexes the source-of-truth files in this repo (`scripts/`, `.claude/skills/`,
 `docs/guides/`) and links external references where useful.

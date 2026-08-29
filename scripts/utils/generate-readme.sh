@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Generate a concrete README.md from project state
 # Usage: generate-readme.sh [--project-dir <path>]
-# Reads from .archetype-manifest.json, repos/, MAINTAINERS.json, knowledge/wiki/
+# Reads from .archetype-manifest.json, repos/, MAINTAINERS.json, the knowledge repo
 
 
 # CR-safe jq (Windows jq emits CRLF; the CR survives $( ) and corrupts values).
@@ -57,7 +57,7 @@ fi
 # --- Check wiki state (the compiled wiki lives in the log repo) ---
 WIKI_STATUS="No wiki pages compiled yet."
 if [[ -d "repos/${LOG_REPO_NAME}/wiki" ]]; then
-    wiki_count="$(find "repos/${LOG_REPO_NAME}/wiki" -name '*.md' -not -name 'INDEX.md' -not -name 'STALENESS.md' 2>/dev/null | wc -l)"
+    wiki_count="$(find "repos/${LOG_REPO_NAME}/wiki" -name '*.md' -not -name 'INDEX.md' -not -name 'STALENESS.md' -not -name 'README.md' -not -name 'schema.md' -not -name 'USAGE.md' 2>/dev/null | wc -l)"
     if [[ "$wiki_count" -gt 0 ]]; then
         WIKI_STATUS="${wiki_count} wiki page(s) compiled in \`repos/${LOG_REPO_NAME}/wiki/\`."
     fi
@@ -160,13 +160,10 @@ ${REPO_TABLE:-| *(none yet)* | — | — |}
 │   ├── session/           # Session lifecycle
 │   ├── repos/             # Child repo management
 │   └── utils/             # Logging, analysis, generation
-├── knowledge/
-│   ├── taxonomy.yaml      # Category taxonomy for the compiled wiki
-│   └── research/          # Research intake (index + deep-dives)
 ├── logs/                  # Stub — actual data in the knowledge repo
 ├── notes/                 # Stub — actual data in the knowledge repo
 ├── repos/
-│   ├── ${LOG_REPO_NAME}/  # Knowledge repo (logs, notes, handoffs, compiled wiki)
+│   ├── ${LOG_REPO_NAME}/  # Knowledge repo (logs, notes, handoffs, research, compiled wiki + taxonomy)
 │   └── <child-repo>/      # Registered application repos (symlink or physical)
 ├── secrets/               # Protected paths (contents gitignored)
 ├── local/                 # Per-machine customization (gitignored)
@@ -268,7 +265,7 @@ data, and data lives where every team member can push.
                          v
 ┌─────────────────────────────┐
 │ wiki/                       │  compiled articles + INDEX.md + STALENESS.md
-│ (same repo, shared by all)  │  categories from knowledge/taxonomy.yaml (root)
+│ (same repo, shared by all)  │  categories from wiki/taxonomy.yaml (same repo)
 └─────────────────────────────┘
 \`\`\`
 

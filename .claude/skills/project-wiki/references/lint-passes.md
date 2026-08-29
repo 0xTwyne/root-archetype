@@ -25,7 +25,7 @@ Detailed documentation for each lint pass in `lint_wiki.py`.
 ## Pass 4: Un-actioned Intake Detection
 
 **Severity**: WARNING
-**Logic**: Load `knowledge/research/intake_index.yaml` (this one stays in the ROOT repo — `knowledge/research/` did not move at the split). A missing index is reported as a warning rather than passing silently. Filter by verdict (`worth_investigating` or `new_opportunity`), no `handoffs_created` field, and `ingested_date` > threshold.
+**Logic**: Load the intake index from `<knowledge-repo>/wiki/research/intake_index.yaml` (falling back to the legacy root `knowledge/research/` for unmigrated projects). A missing index is reported as a warning rather than passing silently. Filter by verdict (`worth_investigating` or `new_opportunity`), no `handoffs_created` field, and `ingested_date` > threshold.
 **Config**: `wiki.yaml` → `lint.unactioned_intake_days` (default 7)
 **Fix**: Create a handoff stub, or change the verdict to `not_applicable`/`already_integrated` if no action is warranted.
 

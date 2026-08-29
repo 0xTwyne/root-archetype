@@ -101,9 +101,11 @@ if [[ -z "$COPY_TO" ]]; then
     # contributor's session paths shipped into every spawned project until
     # 2026-08-29). taxonomy.yaml is config, not instance data — it stays.
     rm -f .promoted-sources 2>/dev/null || true
-    find knowledge/wiki -name '*.md' -delete 2>/dev/null || true
-    find knowledge/research/deep-dives -name '*.md' -delete 2>/dev/null || true
-    rm -f knowledge/research/intake_index.yaml 2>/dev/null || true
+    # Root knowledge/ is archetype-internal in its entirety: the self-doc wiki,
+    # the archetype's research intake, AND taxonomy.yaml (the project's copy is
+    # seeded into the knowledge repo by init-log-repo.sh). A spawned project has
+    # no root knowledge/ at all.
+    rm -rf knowledge 2>/dev/null || true
 else
     # Copy mode: clone archetype tree to target
     PROJECT_ROOT="$COPY_TO"
@@ -114,10 +116,10 @@ else
     fi
     # Copy tracked content, excluding instance-specific data: session history
     # (progress, audit, handoffs), and the archetype's own knowledge base —
-    # its self-documentation wiki, research intake and promotion state. Only
-    # taxonomy.yaml (config) crosses over from knowledge/.
+    # knowledge/ in its entirety. The project's taxonomy is seeded into the
+    # knowledge repo by init-log-repo.sh from templates/log-repo/.
     (cd "$ARCHETYPE_DIR" && git ls-files -z 2>/dev/null || find . -type f -not -path './.git/*' -print0) | \
-        grep -zvE '^(logs/progress/|logs/audit/|notes/.*/handoffs/|notes/handoffs/INDEX|knowledge/wiki/.*\.md|knowledge/research/deep-dives/.*\.md|knowledge/research/intake_index\.yaml|\.promoted-sources)' | \
+        grep -zvE '^(logs/progress/|logs/audit/|notes/.*/handoffs/|notes/handoffs/INDEX|knowledge/|\.promoted-sources)' | \
         (cd "$ARCHETYPE_DIR" && xargs -0 -I{} bash -c '[[ -f "{}" ]] || exit 0; mkdir -p "'"$PROJECT_ROOT"'/$(dirname "{}")" && cp "{}" "'"$PROJECT_ROOT"'/{}"')
     chmod +x "$PROJECT_ROOT"/scripts/**/*.sh "$PROJECT_ROOT"/scripts/**/*.py 2>/dev/null || true
 fi
@@ -149,12 +151,11 @@ case "$ENGINE" in
 esac
 
 # --- Ensure directory structure ---
-# logs/ and notes/ are skeletal stubs in root — actual data lives in the log repo
-mkdir -p knowledge/wiki knowledge/research/deep-dives \
-         logs notes local repos secrets 2>/dev/null || true
-touch knowledge/wiki/.gitkeep knowledge/research/.gitkeep \
-      knowledge/research/deep-dives/.gitkeep \
-      local/.gitkeep repos/.gitkeep secrets/.gitkeep 2>/dev/null || true
+# logs/ and notes/ are skeletal stubs in root — actual data lives in the
+# knowledge repo. No root knowledge/ is created: taxonomy and research live in
+# the knowledge repo (seeded by init-log-repo.sh).
+mkdir -p logs notes local repos secrets 2>/dev/null || true
+touch local/.gitkeep repos/.gitkeep secrets/.gitkeep 2>/dev/null || true
 
 # --- Create log repo ---
 # Both live deployments (sangha-root, twyne-root) converged on

@@ -201,11 +201,18 @@ def main() -> int:
     config = load_wiki_config()
     query_terms = [t.lower() for t in args.query.split() if len(t) > 1]
 
-    # Resolve paths. Intake index and deep-dives are root-repo knowledge/
-    # artifacts (current design); handoffs live in the log repo, per user.
-    index_path = ROOT / config.get("cross_references", {}).get("intake_index",
-        "knowledge/research/intake_index.yaml")
+    # Resolve paths. Research (intake index + deep-dives) and handoffs live in
+    # the knowledge repo; the legacy root knowledge/research/ location is
+    # honoured as a fallback for projects that have not migrated.
     log_root = _log_repo_root()
+
+    def _research_path(rel: str) -> Path:
+        preferred = log_root / "wiki" / "research" / rel
+        legacy = ROOT / "knowledge" / "research" / rel
+        return preferred if preferred.exists() or not legacy.exists() else legacy
+
+    idx_cfg = config.get("cross_references", {}).get("intake_index")
+    index_path = ROOT / idx_cfg if idx_cfg else _research_path("intake_index.yaml")
     handoff_paths_cfg = config.get("cross_references", {}).get("handoffs", {}).get("paths")
     if handoff_paths_cfg:
         handoff_dirs = [log_root / p if not Path(p).is_absolute() else Path(p)
@@ -213,9 +220,8 @@ def main() -> int:
     else:
         # Default: every user's active + completed handoffs, plus the shared dir
         handoff_dirs = sorted(log_root.glob("notes/*/handoffs/active"))                      + sorted(log_root.glob("notes/*/handoffs/completed"))                      + [log_root / "notes" / "handoffs"]
-    deep_dive_rel = config.get("cross_references", {}).get("deep_dives", {}).get("path",
-        "knowledge/research/deep-dives")
-    deep_dive_dir = ROOT / deep_dive_rel
+    dd_cfg = config.get("cross_references", {}).get("deep_dives", {}).get("path")
+    deep_dive_dir = ROOT / dd_cfg if dd_cfg else _research_path("deep-dives")
 
     # Search
     intake_matches = search_intake(index_path, query_terms, args.category, args.max_results)
