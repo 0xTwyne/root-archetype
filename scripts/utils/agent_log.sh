@@ -129,7 +129,16 @@ _agent_log() {
             _AGENT_LOG_BRANCH="$(jq -r '.branch // empty' "$_root/.session-identity" 2>/dev/null || echo "")"
         fi
         _AGENT_LOG_REPO="${_AGENT_LOG_REPO:-$(basename "$_root")}"
-        _AGENT_LOG_BRANCH="${_AGENT_LOG_BRANCH:-$(git -C "$_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")}"
+        # NOT `rev-parse --abbrev-ref HEAD`: on a repo with no commits yet it
+        # prints "HEAD" to stdout AND exits 128, so the `|| echo unknown`
+        # fires too and the field becomes the two-line string "HEAD\nunknown".
+        # That is what init-project.sh's own first audit entries recorded.
+        # `symbolic-ref --short -q HEAD` prints the real branch even on an
+        # unborn branch, and prints nothing (exit 1) only when detached.
+        if [[ -z "${_AGENT_LOG_BRANCH:-}" ]]; then
+            _AGENT_LOG_BRANCH="$(git -C "$_root" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+            [[ -n "$_AGENT_LOG_BRANCH" ]] || _AGENT_LOG_BRANCH="unknown"
+        fi
     fi
 
     local json

@@ -1,0 +1,53 @@
+name: spawn-integrity
+
+# Answers the one question the unit tests cannot: can this archetype create a
+# correctly structured and wired fresh root project?
+#
+# Hook unit tests, protected-paths, and a clean diff all passed on 2026-08-29
+# while a spawned project shipped with a failing validator, audit entries
+# written to the wrong repo, a malformed provenance field, and two advertised
+# security layers inert. None of that is visible without spawning one.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spawn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      # init-project.sh needs an identity to stamp into the manifest, and
+      # refuses to run without one.
+      - name: Configure git identity
+        run: |
+          git config --global user.email "ci@example.invalid"
+          git config --global user.name "CI"
+          git config --global init.defaultBranch main
+
+      # The test neutralises `gh` itself via GH_CONFIG_DIR, but the runner
+      # ships an authenticated-looking gh; belt and braces.
+      - name: Spawn a fresh project and assert its integrity
+        env:
+          GH_TOKEN: ""
+        run: bash scripts/validate/test_spawn.sh
+
+      - name: Validators on the archetype itself
+        run: |
+          set -euo pipefail
+          for v in scripts/validate/validate_*.sh; do echo "-- $v"; bash "$v"; done
+          for v in scripts/validate/validate_*.py; do echo "-- $v"; python3 "$v"; done
+
+      - name: Hook tests on the archetype itself
+        run: |
+          set -euo pipefail
+          for t in scripts/hooks/tests/*.sh; do echo "-- $t"; bash "$t"; done
