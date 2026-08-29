@@ -74,4 +74,35 @@ if [[ -x "$SCANNER" || -f "$SCANNER" ]]; then
     fi
 fi
 
+# --- 3. HOOKS.lock freshness ---
+#
+# scripts/hooks/ and scripts/validate/ are sha256-locked in HOOKS.lock. A commit
+# that changes either tree without restaging the lock leaves the drift check
+# failing on *main* rather than on the branch that caused it.
+#
+# This happened on 2026-08-29: two PRs were each green on their own. One changed
+# scripts/hooks/; the other carried a HOOKS.lock generated before it. The
+# second's CI was green against the main it branched from, and stale by the time
+# it merged. Catching it here makes the commit that changes a locked file the
+# commit that has to carry the lock -- which CI alone cannot guarantee, because
+# a PR's checks can pass against a main that has since moved.
+#
+# `|| true` on both greps: they exit 1 when they select nothing, and this script
+# runs under `set -euo pipefail`.
+if [[ -f "$REPO_ROOT/HOOKS.lock" ]]; then
+    LOCKED_CHANGED="$(git diff --cached --name-only --diff-filter=ACMRD \
+                      | grep -E '^scripts/(hooks|validate)/' || true)"
+    LOCK_STAGED="$(git diff --cached --name-only --diff-filter=ACMR \
+                   | grep -x 'HOOKS.lock' || true)"
+    if [[ -n "$LOCKED_CHANGED" && -z "$LOCK_STAGED" ]]; then
+        echo "pre-commit: HOOKS.lock is stale." >&2
+        echo "  These staged files are inside the locked tree:" >&2
+        printf '    %s\n' $LOCKED_CHANGED >&2
+        echo "  but HOOKS.lock is not staged. Run:" >&2
+        echo "      bash scripts/validate/update_hooks_lock.sh && git add HOOKS.lock" >&2
+        echo "  then commit again. Bypass (deliberate, visible): SANGHA_SKIP_GUARDS=1" >&2
+        exit 1
+    fi
+fi
+
 exit 0
