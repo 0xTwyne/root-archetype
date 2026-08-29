@@ -114,6 +114,32 @@ for v in scripts/validate/validate_*.py; do
     else bad "$(basename "$v")" "exit non-zero in a fresh project"; fi
 done
 
+# --- Hook timeouts are in seconds ---------------------------------------
+# `timeout` in settings.json is SECONDS (Claude Code hooks docs), not
+# milliseconds. Every entry here was once 5000-15000, i.e. 1h23m-4h10m, so a
+# wedged hook would stall a tool call for over an hour before being cancelled.
+# JSON has no comments, so the unit cannot be recorded next to the values --
+# this assertion is where it lives. 120s is generously above any legitimate
+# hook and far below a millisecond-shaped mistake.
+BADT="$(python3 - "$DEST/.claude/settings.json" <<'PY' 2>/dev/null || true
+import json, sys
+try: d = json.load(open(sys.argv[1]))
+except Exception: sys.exit(0)
+for ev, arr in d.get("hooks", {}).items():
+    for m in arr:
+        for h in m.get("hooks", []):
+            t = h.get("timeout")
+            if isinstance(t, int) and t > 120:
+                print("%s:%s=%s" % (ev, h.get("command","?").split("hooks/")[-1].rstrip('"'), t))
+PY
+)"
+if [[ -z "$BADT" ]]; then
+    ok "hook timeouts are plausible as seconds (all <= 120)"
+else
+    bad "hook timeouts are plausible as seconds" \
+        "looks like milliseconds: $(echo $BADT | cut -c1-70)"
+fi
+
 # --- Hooks are actually wired -------------------------------------------
 # Exact set, not a count. A count passes while a settings change silently
 # drops check_secrets_read.sh and adds something else in its place.
