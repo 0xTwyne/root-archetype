@@ -29,7 +29,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-LOG_REPO_NAME="${PROJECT_NAME}-logs"
+# Name follows the path — init-project.sh chooses the path (default
+# repos/<project>-knowledge), and forcing a different name here is how the
+# registered name used to desync from the directory.
+LOG_REPO_NAME="$(basename "$LOG_REPO_PATH")"
 
 echo "=== Creating log repo: ${LOG_REPO_NAME} ==="
 echo "  Path: ${LOG_REPO_PATH}"

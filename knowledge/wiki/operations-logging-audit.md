@@ -19,7 +19,7 @@ Session-start and session-end hooks write logs/notes to the configured log repo 
 - Per-user scoping eliminates cross-user write collisions structurally
 - `scripts/utils/push-logs.sh` uses git worktree + lockfile to push log-only commits to main
 - `git worktree prune` + validity check before checkout handles stale worktrees across host/container
-- `--log-repo` flag at init splits logs into `repos/<project>-logs/`; default is single-repo
+- `--knowledge-repo` flag at init sets a custom path; default is `repos/<project>-knowledge/`
 - Session-start writes `.session-identity` (gitignored); session-end pushes logs and progress
 
 ## See Also

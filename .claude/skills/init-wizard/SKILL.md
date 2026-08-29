@@ -21,11 +21,11 @@ Guided project initialization wizard for new archetype instances.
 
 ### Step 1.5: Log repo setup
 
-- Show: "Log repo will be created at `repos/<project-name>-logs/` (default). Enter a custom path or press Enter to accept."
+- Show: "Knowledge repo will be created at `repos/<project-name>-knowledge/` (default). Enter a custom path or press Enter to accept."
 - Accept custom path or confirm default — always display the default explicitly
 - Run `scripts/utils/init-log-repo.sh <path> <project-name>`
-- Register via `scripts/repos/register-repo.sh <name>-logs <path> --purpose "Session logs, notes, handoffs, per-member wikis" --no-scaffold`
-- Add `repos/<name>-logs/` to root `.gitignore`
+- Register via `scripts/repos/register-repo.sh <basename-of-path> <path> --purpose "Session logs, notes, handoffs, compiled wiki" --no-scaffold`
+- Add `repos/<basename-of-path>/` to root `.gitignore`
 - Update `.archetype-manifest.json` with `log_repo_name`
 
 ### Step 2: Register child repos

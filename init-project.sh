@@ -25,7 +25,7 @@ Options:
   --guided           Drop .needs-init marker for interactive wizard
   --repos <list>     Comma-separated child repos (name:path pairs)
   --description <d>  Short project description
-  --log-repo <path>  Custom log repo path (default: repos/<name>-logs)
+  --knowledge-repo <path>  Custom knowledge repo path (default: repos/<name>-knowledge)
   --force            Allow init with uncommitted changes
 
 Examples:
@@ -47,7 +47,8 @@ while [[ $# -gt 0 ]]; do
         --guided) GUIDED=true; shift ;;
         --repos) REPOS="$2"; shift 2 ;;
         --description) DESCRIPTION="$2"; shift 2 ;;
-        --log-repo) LOG_REPO_OVERRIDE="$2"; shift 2 ;;
+        --knowledge-repo) LOG_REPO_OVERRIDE="$2"; shift 2 ;;
+        --log-repo) LOG_REPO_OVERRIDE="$2"; shift 2 ;;  # undocumented back-compat alias
         --force) FORCE=true; shift ;;
         *) echo "Unknown: $1"; usage ;;
     esac
@@ -156,8 +157,13 @@ touch knowledge/wiki/.gitkeep knowledge/research/.gitkeep \
       local/.gitkeep repos/.gitkeep secrets/.gitkeep 2>/dev/null || true
 
 # --- Create log repo ---
-LOG_REPO_NAME="${PROJECT_NAME}-logs"
-LOG_REPO_PATH="${LOG_REPO_OVERRIDE:-$(pwd)/repos/${LOG_REPO_NAME}}"
+# Both live deployments (sangha-root, twyne-root) converged on
+# repos/<project>-knowledge — by hand, post-init, because this script forced
+# "-logs". The default now matches them. With a custom path, the NAME follows
+# the path's basename so the registered name, the gitignore entry and the
+# manifest can never disagree with where the repo actually is.
+LOG_REPO_PATH="${LOG_REPO_OVERRIDE:-$(pwd)/repos/${PROJECT_NAME}-knowledge}"
+LOG_REPO_NAME="$(basename "$LOG_REPO_PATH")"
 echo ""
 echo "Creating log repo: ${LOG_REPO_NAME}"
 echo "  Path: ${LOG_REPO_PATH} $([[ -z "$LOG_REPO_OVERRIDE" ]] && echo "(default)" || echo "(custom)")"
