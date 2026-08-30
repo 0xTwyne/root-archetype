@@ -190,6 +190,19 @@ if [[ -d "$LOG_REPO_PATH" ]]; then
     bash scripts/repos/register-repo.sh "$LOG_REPO_NAME" "$LOG_REPO_PATH" \
         --purpose "Session logs, notes, handoffs, per-member wikis" \
         --no-scaffold 2>/dev/null || true
+
+    # Commit whatever registration just seeded.
+    #
+    # init-log-repo.sh makes the initial commit BEFORE this point, so anything
+    # register-repo.sh writes afterwards (the CLAUDE.md session-tooling pointer)
+    # lands untracked. Nothing else would ever pick it up either: push-logs.sh
+    # stages logs/, notes/ and wiki/, not the knowledge repo's root, so the file
+    # would sit dirty in every session forever.
+    if [[ -n "$(git -C "$LOG_REPO_PATH" status --porcelain 2>/dev/null)" ]]; then
+        git -C "$LOG_REPO_PATH" add -A >/dev/null 2>&1 || true
+        git -C "$LOG_REPO_PATH" commit -q -m "init: session-tooling pointer for ${LOG_REPO_NAME}" \
+            >/dev/null 2>&1 || true
+    fi
 fi
 
 # Add knowledge repo directory to .gitignore (prevent parent from tracking nested repo content)

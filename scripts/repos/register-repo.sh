@@ -91,22 +91,52 @@ fi
 # died at runtime with "bad substitution" and aborted registration.
 PURPOSE_TEXT="${PURPOSE:-Configure the purpose of this repo.}"
 
+# --- Seed the child's CLAUDE.md ---------------------------------------------
+#
+# This runs even under --no-scaffold. The pointer below is not agent
+# scaffolding, it is a safety notice, and the repo most in need of it is the
+# knowledge repo -- which init-project.sh registers with --no-scaffold.
+#
+# Why it is needed: Claude Code resolves skills from a project's own
+# .claude/skills/, and a child repo has none, so a session LAUNCHED inside one
+# gets no /wrap-up, no /safe-commit, and no session hooks -- no audit trail and
+# no progress report. The failure is silent. CLAUDE.md is the one channel that
+# still reaches such a session, because it loads from the working directory and
+# every directory above it.
+if [[ -d "$REPO_PATH" ]] && [[ ! -f "${REPO_PATH}/CLAUDE.md" ]]; then
+    {
+        echo "# ${REPO_NAME}"
+        echo ""
+        if [[ "$NO_SCAFFOLD" != true ]]; then
+            echo "## Purpose"
+            echo ""
+            echo "${PURPOSE_TEXT}"
+            echo ""
+            echo "## Code Style"
+            echo ""
+            echo "- Follow existing project conventions"
+            echo "- Run validation after producing artifacts"
+            echo ""
+        fi
+        echo "## Session tooling lives in the governance root"
+        echo ""
+        echo "Skills resolve from a project's own \`.claude/skills/\`, and this repo has"
+        echo "none. A session **launched here** therefore has no \`/wrap-up\`,"
+        echo "\`/safe-commit\` or \`/project-wiki\`, and none of the session hooks: no"
+        echo "audit trail, no progress report, no session branch. Nothing announces this."
+        echo ""
+        echo "**Start sessions from the governance root and \`cd\` here.\`\`"
+        echo "CLAUDE_PROJECT_DIR\` stays at the root, the tooling resolves, and this repo"
+        echo "is still fully editable. Starting at the root and moving here works;"
+        echo "launching here does not."
+        echo ""
+        echo "If you are already in a session launched here: finish the work, then run"
+        echo "\`/wrap-up\` from a root session so it gets recorded."
+    } > "${REPO_PATH}/CLAUDE.md"
+    echo "Seeded: ${REPO_PATH}/CLAUDE.md"
+fi
+
 if [[ "$NO_SCAFFOLD" != true ]] && [[ -d "$REPO_PATH" ]]; then
-    if [[ ! -f "${REPO_PATH}/CLAUDE.md" ]]; then
-        cat > "${REPO_PATH}/CLAUDE.md" << CLAUDE_EOF
-# ${REPO_NAME}
-
-## Purpose
-
-${PURPOSE_TEXT}
-
-## Code Style
-
-- Follow existing project conventions
-- Run validation after producing artifacts
-CLAUDE_EOF
-        echo "Seeded: ${REPO_PATH}/CLAUDE.md"
-    fi
 
     if [[ ! -d "${REPO_PATH}/agents" ]]; then
         mkdir -p "${REPO_PATH}/agents"

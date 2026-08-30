@@ -331,6 +331,19 @@ if shape reposproj --repos "childlib:$CHILD"; then
     ok "spawn --repos exits 0"
     [[ -d "$SANDBOX/reposproj/repos/childlib" ]] && ok "--repos links the child repo" \
         || bad "--repos links the child repo" "repos/childlib missing"
+    # The child must carry the session-tooling pointer. Skills do not resolve
+    # inside a child repo, and the failure is silent -- CLAUDE.md is the only
+    # channel that still reaches a session launched there.
+    if grep -q "governance root" "$SANDBOX/reposproj/repos/childlib/CLAUDE.md" 2>/dev/null; then
+        ok "--repos seeds the child's session-tooling pointer"
+    else
+        bad "--repos seeds the child's session-tooling pointer" "CLAUDE.md missing or silent about it"
+    fi
+    if grep -q "governance root" "$SANDBOX/reposproj/repos/reposproj-knowledge/CLAUDE.md" 2>/dev/null; then
+        ok "knowledge repo carries the pointer too (despite --no-scaffold)"
+    else
+        bad "knowledge repo carries the pointer too" "CLAUDE.md missing or silent about it"
+    fi
     if jq -e '[.repos[].name] | index("childlib") and index("reposproj-knowledge")' \
          "$SANDBOX/reposproj/repos/repos.json" >/dev/null 2>&1; then
         ok "--repos registers child and knowledge repos together"
