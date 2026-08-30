@@ -3,7 +3,7 @@
 # Locked roots: scripts/hooks scripts/validate
 # Excluded:     scripts/hooks/lib/tools.lock
 #
-# Regenerated: 2026-08-29T18:35:31Z
+# Regenerated: 2026-08-30T14:11:15Z
 # By:          scripts/validate/update_hooks_lock.sh
 #
 # A drifted lock means a hook or validator changed since last review.
@@ -38,7 +38,7 @@ d106477d5a70b5eca97a8c38497c0350898d481e721829aa8913f8063ea683da  scripts/hooks/
 1fac064d3eb0cf107cc713566f32951542eb24e4a9dd6eb768f3cc94b975c015  scripts/hooks/tests/test_root_write_isolation.sh
 1837b9050055e6a5fbd8f68e30a7e33a19b790ba7ff101539697a8a3e1f6ca7a  scripts/hooks/tests/test_session_end_logging.sh
 a42a9e0257030f5dcf2a01bbe3a159b1556bd8cc2c2dcd35f98c15d6cdc3a45c  scripts/hooks/wiki-recall.sh
-4890dc7f3d28be2198bb03f41154089d78121eccbb7462e66b5c1c27a5ef45f8  scripts/validate/test_spawn.sh
+735742a41c3759d135fcad574ba95386ed4b73503f1afc939b8beb55c72f23c4  scripts/validate/test_spawn.sh
 f06ca96f281369ca7b8500693ad4fc02d303eb4d9cf31ec972689293e11e18fe  scripts/validate/update_hooks_lock.sh
 cfdce7e9b5828e36a28556f4d7878536cafa5d8cc8bb25a63fa86558674c86e3  scripts/validate/validate_agents_references.py
 0e9309689b3b260d86dc1a51417454ce6ebddd04cc961a8a83fe385d661ba12e  scripts/validate/validate_agents_structure.py
