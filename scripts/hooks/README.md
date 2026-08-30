@@ -121,7 +121,7 @@ so paths resolve correctly regardless of working directory:
     {
       "type": "command",
       "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/pre-edit-guard.sh\"",
-      "timeout": 5000
+      "timeout": 10
     }
   ]
 }
@@ -130,3 +130,25 @@ so paths resolve correctly regardless of working directory:
 Do **not** use bare relative paths like `bash scripts/hooks/pre-edit-guard.sh` —
 these fail when Claude Code's working directory is not the project root
 (e.g., during worktree operations or subagent execution).
+
+## `timeout` is in SECONDS
+
+Not milliseconds. This has bitten once already: every entry in
+`.claude/settings.json` was 5000-15000, which reads as 1h23m to 4h10m, so a
+wedged hook would stall a tool call for over an hour before Claude Code
+cancelled it. They were written as milliseconds.
+
+Size it as *"this hook has hung"*, never as a latency budget. Ten seconds is
+generous for a guard that normally finishes in well under one.
+
+Two behaviours worth knowing:
+
+- **A timed-out hook fails open.** Claude Code discards its output and the tool
+  call continues through the normal permission flow, so a stalled guard is not
+  a gate.
+- **`SessionEnd` hooks share a 1.5 s budget**, and a longer per-hook `timeout`
+  raises that budget to match, capped at 60 s.
+
+JSON has no comments, so the unit cannot be recorded beside the values. The
+check that enforces it lives in `scripts/validate/test_spawn.sh`, which fails
+if any timeout exceeds 120.
