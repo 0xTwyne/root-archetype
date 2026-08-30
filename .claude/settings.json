@@ -22,7 +22,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/session-end.sh\"",
-            "timeout": 45
+            "timeout": 60
           }
         ]
       }
@@ -61,7 +61,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/check_secrets_read.sh\"",
-            "timeout": 10
+            "timeout": 120
           }
         ]
       },
@@ -71,22 +71,22 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/check_filesystem_path.sh\"",
-            "timeout": 10
+            "timeout": 60
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/pre-edit-guard.sh\"",
-            "timeout": 15
+            "timeout": 120
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/agents_reference_guard.sh\"",
-            "timeout": 10
+            "timeout": 60
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/agents_schema_guard.sh\"",
-            "timeout": 10
+            "timeout": 60
           }
         ]
       },
@@ -96,12 +96,12 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/check_clone_destination.sh\"",
-            "timeout": 20
+            "timeout": 60
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/check_test_safety.sh\"",
-            "timeout": 10
+            "timeout": 60
           }
         ]
       },

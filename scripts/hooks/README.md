@@ -138,8 +138,18 @@ Not milliseconds. This has bitten once already: every entry in
 wedged hook would stall a tool call for over an hour before Claude Code
 cancelled it. They were written as milliseconds.
 
-Size it as *"this hook has hung"*, never as a latency budget. Ten seconds is
-generous for a guard that normally finishes in well under one.
+Size it as *"this hook has hung"*, never as a latency budget — but **do not
+size it small**. A hook that can BLOCK fails open when it times out, so a short
+timeout on a guard converts "slow" into "silently permitted". Split it by what
+the hook is:
+
+- **Can block** (`check_secrets_read`, `pre-edit-guard`, `check_filesystem_path`,
+  `check_clone_destination`, `check_test_safety`, the `agents_*` guards):
+  generous — 60 s, or 120 s for the subprocess-heavy scans. Timing out means it
+  stopped guarding.
+- **Only observes** (`post-tool-use-audit`, `wiki-recall`, `skill_usage_log`,
+  `correction-detection`, `post-edit-check`): modest — 10-15 s. A timeout costs
+  a log line or a context injection, not a gate.
 
 Two behaviours worth knowing:
 

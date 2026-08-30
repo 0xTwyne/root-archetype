@@ -3,14 +3,14 @@
 # Locked roots: scripts/hooks scripts/validate
 # Excluded:     scripts/hooks/lib/tools.lock
 #
-# Regenerated: 2026-08-30T14:11:15Z
+# Regenerated: 2026-08-30T16:04:49Z
 # By:          scripts/validate/update_hooks_lock.sh
 #
 # A drifted lock means a hook or validator changed since last review.
 # Run 'scripts/validate/validate_hooks_lock.sh --diff' to inspect drift.
 # Re-run this script to acknowledge the changes after review.
 
-dea926638dfc9ed724418e8975ebdcf6ca4496d57f3d650201993540bbeda1f7  scripts/hooks/README.md
+4acea001c95fbcc982f81053b83e6d794acc26e9830e115ea34f48bc96573af1  scripts/hooks/README.md
 ec62ce04413455380c6998dc95bd8f01d174c9d16f1b1e6459e3436138c6d196  scripts/hooks/agents_reference_guard.sh
 e8b6ac37896c60ecdd946c12435d361d8aac3c0ba30caddd39727cd6949fe490  scripts/hooks/agents_schema_guard.sh
 31e4066dfb06dd1a08e31330deb1337434cce1d3870f64765e356304ad4eecee  scripts/hooks/check_clone_destination.sh
