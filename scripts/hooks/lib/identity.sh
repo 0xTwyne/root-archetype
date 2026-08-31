@@ -38,28 +38,36 @@ hook_canonical_user() {
   [[ -f "$registry" ]] || { echo "$raw"; return 0; }
   command -v jq >/dev/null 2>&1 || { echo "$raw"; return 0; }
 
-  # Everything this person could currently present as. Compared
-  # case-insensitively, so "AdaLovelace" matches "adalovelace".
-  local gh_login git_name git_email
-  gh_login="$(gh api user --jq '.login' 2>/dev/null || echo "")"
-  git_name="$(git config user.name 2>/dev/null || echo "")"
-  git_email="$(git config user.email 2>/dev/null || echo "")"
-
+  # Match on the RESOLVED NAME ONLY. Compared case-insensitively, so
+  # "AdaLovelace" matches "adalovelace".
+  #
+  # This deliberately does NOT also match on the gh login, git user.name, git
+  # user.email or $USER. It used to, with any one of them sufficient on its own.
+  # That is right for the case it was written for and wrong one step outside it:
+  # in a shared devcontainer git user.email is inherited from the image and
+  # $USER is the same string for every collaborator, so everyone who has not
+  # registered resolves to whoever registered first, and two humans write into
+  # one set of per-user directories. That is worse than the alias split this
+  # registry exists to prevent, because nothing about it looks wrong.
+  #
+  # Matching the resolved name alone still covers every documented case: the
+  # name session-start.sh produces IS the fallback-derived identity (gh login,
+  # or sanitised git user.name, or $USER), and each of those forms is what gets
+  # recorded as an alias. E-mail aliases stay in the registry for other
+  # consumers; they are not username evidence.
   local canonical
-  canonical="$(jq -r --arg raw "$raw" --arg gh "$gh_login" --arg gn "$git_name" \
-                     --arg ge "$git_email" --arg u "${USER:-}" '
+  canonical="$(jq -r --arg raw "$raw" '
     def norm: ascii_downcase | gsub("[^a-z0-9_@.-]"; "");
-    # Parenthesised so the binding does not pipe the array onward — otherwise
-    # `.users` is evaluated against the array instead of the document and every
-    # lookup silently returns nothing.
-    ([$raw, $gh, $gn, $ge, $u] | map(select(. != "")) | map(norm)) as $mine
+    ($raw | norm) as $me
     | [ .users[]?
         | select(
-            (([.canonical // ""] + (.aliases // [])) | map(norm)
-             | any(. as $a | $mine | index($a) != null))
+            (([.canonical // ""] + (.aliases // [])) | map(norm) | index($me) != null)
           )
         | .canonical ]
-    | first // ""
+    # Two entries claiming one alias is a registry error. Rewriting on a guess
+    # would put the wrong work in the wrong directory, so resolve to nothing
+    # and let the caller keep the raw name.
+    | if length == 1 then .[0] else "" end
   ' "$registry" 2>/dev/null || echo "")"
 
   if [[ -n "$canonical" && "$canonical" != "null" ]]; then
@@ -67,6 +75,35 @@ hook_canonical_user() {
   else
     echo "$raw"
   fi
+}
+
+# --- Who owns an identity string? ---
+# Usage: hook_identity_owner <string>
+# Echoes the canonical user that has claimed this string (as its canonical name
+# or as one of its aliases), or NOTHING when no one has. Unlike
+# hook_canonical_user, which echoes its input back when unresolved, this
+# distinguishes "registered to <person>" from "not registered at all" — which is
+# the distinction the maintainer check needs, because the two cases have to be
+# handled differently.
+hook_identity_owner() {
+  local raw="${1:-}"
+  [[ -n "$raw" ]] || { echo ""; return 0; }
+
+  hook_resolve_log_repo 2>/dev/null || { echo ""; return 0; }
+  local registry="${LOG_REPO_DIR:-}/identities.json"
+  [[ -f "$registry" ]] || { echo ""; return 0; }
+  command -v jq >/dev/null 2>&1 || { echo ""; return 0; }
+
+  jq -r --arg raw "$raw" '
+    def norm: ascii_downcase | gsub("[^a-z0-9_@.-]"; "");
+    ($raw | norm) as $me
+    | [ .users[]?
+        | select(
+            (([.canonical // ""] + (.aliases // [])) | map(norm) | index($me) != null)
+          )
+        | .canonical ]
+    | if length == 1 then .[0] else "" end
+  ' "$registry" 2>/dev/null || echo ""
 }
 
 # --- Warn when a user looks unregistered and ambiguous ---

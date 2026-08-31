@@ -19,6 +19,14 @@ usage() {
     echo "  path           Absolute path to the repo"
     echo "  --purpose      Optional description of the repo's role"
     echo "  --no-scaffold  Skip agent file seeding (for infrastructure repos)"
+    echo "  --maintainer   Email of a maintainer for THIS repo. Repeatable."
+    echo "                 Recorded in MAINTAINERS.json -> repo_maintainers[<name>],"
+    echo "                 which pre-edit-guard.sh reads to decide who may edit"
+    echo "                 the repo's config. Declaring it beats the detection"
+    echo "                 fallback, which guesses from committer history and"
+    echo "                 packaging metadata and is wrong for any repo that"
+    echo "                 arrives as a squashed import authored by whoever ran"
+    echo "                 the import."
     exit 1
 }
 
@@ -30,10 +38,12 @@ shift 2
 
 PURPOSE=""
 NO_SCAFFOLD=false
+DECLARED_MAINTAINERS=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --purpose) PURPOSE="$2"; shift 2 ;;
         --no-scaffold) NO_SCAFFOLD=true; shift ;;
+        --maintainer) DECLARED_MAINTAINERS+=("$2"); shift 2 ;;
         *) echo "Unknown: $1"; usage ;;
     esac
 done
@@ -136,7 +146,19 @@ if [[ -d "$REPO_PATH" ]] && [[ ! -f "${REPO_PATH}/CLAUDE.md" ]]; then
     echo "Seeded: ${REPO_PATH}/CLAUDE.md"
 fi
 
-if [[ "$NO_SCAFFOLD" != true ]] && [[ -d "$REPO_PATH" ]]; then
+# A repo that already carries AGENT.md or CLAUDE.md is configured, and very
+# often is not ours to write into: registering a collaborator's existing repo
+# dropped a generic agents/developer.md into their working tree, where it shows
+# up as an untracked file in a clone the registering user does not own.
+# --no-scaffold covers the case you anticipate; this covers the one you do not.
+ALREADY_CONFIGURED=false
+if [[ -f "${REPO_PATH}/AGENT.md" || -f "${REPO_PATH}/CLAUDE.md" ]]; then
+    ALREADY_CONFIGURED=true
+fi
+
+if [[ "$NO_SCAFFOLD" != true ]] && [[ -d "$REPO_PATH" ]] && [[ "$ALREADY_CONFIGURED" == "true" ]]; then
+    echo "Skipped seeding: ${REPO_NAME} already has agent instructions."
+elif [[ "$NO_SCAFFOLD" != true ]] && [[ -d "$REPO_PATH" ]]; then
 
     if [[ ! -d "${REPO_PATH}/agents" ]]; then
         mkdir -p "${REPO_PATH}/agents"
@@ -170,19 +192,48 @@ AGENT_EOF
     fi
 fi
 
-# --- Auto-detect maintainers from child repo ---
-DETECT_SCRIPT="${ROOT_DIR}/scripts/utils/detect-maintainers.sh"
-if [[ -x "$DETECT_SCRIPT" ]] && [[ -d "$REPO_PATH" ]]; then
-    DETECTED="$(bash "$DETECT_SCRIPT" "$REPO_NAME" "$REPO_PATH" 2>/dev/null || echo "")"
-    if [[ -n "$DETECTED" ]] && [[ "$DETECTED" != "{}" ]] && command -v jq &>/dev/null; then
-        EMAILS="$(echo "$DETECTED" | jq -c '[.maintainers[].email]')"
-        MAINT_FILE="${ROOT_DIR}/MAINTAINERS.json"
-        if [[ -f "$MAINT_FILE" ]]; then
-            jq --arg repo "$REPO_NAME" --argjson emails "$EMAILS" \
-               '.repo_maintainers[$repo] = $emails' "$MAINT_FILE" > "${MAINT_FILE}.tmp" \
-               && mv "${MAINT_FILE}.tmp" "$MAINT_FILE"
-            echo "Auto-detected maintainers for ${REPO_NAME}: $(echo "$EMAILS" | jq -r 'join(", ")')"
+# --- Record the repo maintainers ---
+# repo_maintainers[<name>] is what pre-edit-guard.sh reads to decide who may
+# edit this repo's config, so this is a permission decision, not bookkeeping.
+# An explicit --maintainer wins; detection stays as a fallback and is labelled
+# as such, because for a repo imported as one squashed commit it names whoever
+# ran the import rather than whoever owns the work.
+MAINT_FILE="${ROOT_DIR}/MAINTAINERS.json"
+if command -v jq &>/dev/null && [[ -f "$MAINT_FILE" ]]; then
+    MAINT_SOURCE=""
+    EMAILS_JSON=""
+    if (( ${#DECLARED_MAINTAINERS[@]} > 0 )); then
+        EMAILS_JSON="$(printf '%s\n' "${DECLARED_MAINTAINERS[@]}" | jq -R . | jq -sc 'unique')"
+        MAINT_SOURCE="declared"
+    else
+        DETECT_SCRIPT="${ROOT_DIR}/scripts/utils/detect-maintainers.sh"
+        if [[ -f "$DETECT_SCRIPT" && -d "$REPO_PATH" ]]; then
+            DETECTED="$(bash "$DETECT_SCRIPT" "$REPO_NAME" "$REPO_PATH" 2>/dev/null || echo "")"
+            if [[ -n "$DETECTED" && "$DETECTED" != "{}" ]]; then
+                EMAILS_JSON="$(echo "$DETECTED" | jq -c '[.maintainers[].email] | unique')"
+                MAINT_SOURCE="auto-detected"
+            fi
         fi
+    fi
+
+    if [[ -n "$EMAILS_JSON" && "$EMAILS_JSON" != "[]" ]]; then
+        if jq --arg repo "$REPO_NAME" --argjson emails "$EMAILS_JSON" \
+              '.repo_maintainers = ((.repo_maintainers // {}) | .[$repo] = $emails)' \
+              "$MAINT_FILE" > "${MAINT_FILE}.tmp" 2>/dev/null; then
+            mv "${MAINT_FILE}.tmp" "$MAINT_FILE"
+            echo "Maintainers for ${REPO_NAME} (${MAINT_SOURCE}): $(echo "$EMAILS_JSON" | jq -r 'join(", ")')"
+            # Spelt as `if`, not `[[ ]] &&`: a trailing false AND-list under
+            # `set -e` is a repeat trap in this codebase.
+            if [[ "$MAINT_SOURCE" == "auto-detected" ]]; then
+                echo "  Detected from repo metadata, not declared. Re-run with --maintainer to correct it."
+            fi
+        else
+            rm -f "${MAINT_FILE}.tmp"
+            echo "WARNING: could not update MAINTAINERS.json" >&2
+        fi
+    else
+        echo "No maintainer recorded for ${REPO_NAME}. Pass --maintainer <email> to set one."
+        echo "  Until then nobody but a global maintainer can edit this repo's config."
     fi
 fi
 
@@ -199,6 +250,14 @@ if command -v jq &>/dev/null; then
     fi
 
     [[ -f "$REPOS_MANIFEST" ]] || echo '{"repos": []}' > "$REPOS_MANIFEST"
+
+    # Re-registering without --purpose must not erase the purpose on record.
+    # The rewrite below replaces the whole entry, so carry it forward.
+    if [[ -z "$PURPOSE" ]]; then
+        PURPOSE="$(jq -r --arg name "$REPO_NAME" \
+            '(.repos[]? | select(.name == $name) | .purpose) // ""' \
+            "$REPOS_MANIFEST" 2>/dev/null || echo "")"
+    fi
 
     if jq --arg name "$REPO_NAME" \
           --arg url "$CLONE_URL" \
