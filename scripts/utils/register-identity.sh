@@ -85,9 +85,30 @@ if [[ -z "$CANONICAL" ]]; then
     exit 1
 fi
 
+# Usernames that identify a container image rather than a person. $USER is
+# "node" in every devcontainer built from the same image, "root" in a bare
+# container, "ubuntu"/"ec2-user" on a stock cloud VM. Recording one as an alias
+# maps EVERY unregistered person on that image onto whoever registered first —
+# the exact identity collision this registry exists to prevent, inverted.
+# An explicit --alias still wins, on the assumption it was deliberate.
+_is_generic_username() {
+    case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+        node|root|ubuntu|vscode|user|dev|admin|devcontainer|codespace|ec2-user|runner)
+            return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 ALIASES=()
-for a in "$GH_LOGIN" "$GIT_NAME" "$GIT_NAME_SANITIZED" "$GIT_EMAIL" "$SHELL_USER" \
-         ${EXTRA_ALIASES[@]+"${EXTRA_ALIASES[@]}"}; do
+for a in "$GH_LOGIN" "$GIT_NAME" "$GIT_NAME_SANITIZED" "$GIT_EMAIL" "$SHELL_USER"; do
+    [[ -n "$a" && "$a" != "$CANONICAL" ]] || continue
+    if _is_generic_username "$a"; then
+        echo "  skipped:   $a (generic container username, not a person)" >&2
+        continue
+    fi
+    ALIASES+=("$a")
+done
+for a in ${EXTRA_ALIASES[@]+"${EXTRA_ALIASES[@]}"}; do
     [[ -n "$a" && "$a" != "$CANONICAL" ]] || continue
     ALIASES+=("$a")
 done

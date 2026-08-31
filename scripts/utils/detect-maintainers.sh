@@ -33,8 +33,19 @@ add_maintainer() {
     [[ -z "$email" ]] && return
     # Normalize: lowercase, trim
     email="$(echo "$email" | tr '[:upper:]' '[:lower:]' | xargs)"
-    # Skip noreply / bot addresses
-    [[ "$email" == *noreply* || "$email" == *bot@* || "$email" == *[bot]* ]] && return
+    # Skip noreply / bot addresses.
+    #
+    # The last test used to be `*[bot]*`, which is a glob BRACKET EXPRESSION: it
+    # matches any address containing the letter b, o or t. That is almost every
+    # address there is — "margot@margotbits.com" and "alice@example.com" were
+    # both discarded as bots, so detection returned {} for real repositories and
+    # repo_maintainers was never populated by anything. Bracket the literal
+    # characters instead.
+    local lower
+    lower="$(printf '%s' "$email" | tr '[:upper:]' '[:lower:]')"
+    case "$lower" in
+        *noreply*|*bot@*|*'[bot]'*|*-bot|*.bot) return ;;
+    esac
     # Check for duplicate
     for existing in "${MAINTAINERS[@]+"${MAINTAINERS[@]}"}"; do
         [[ "$existing" == "${email}|"* ]] && return

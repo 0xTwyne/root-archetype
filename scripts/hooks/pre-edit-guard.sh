@@ -127,18 +127,48 @@ fi
 REL_PATH="${FILE_PATH#$PROJECT_DIR/}"
 USER_EMAIL="$(git config user.email 2>/dev/null || echo "")"
 
-IS_CORE=false
-# .claude/* and CLAUDE.md are tracked in git and protected at runtime
+# --- Which repo governs this path? ---
+# A path under repos/<name>/ is governed by that child repo: its own maintainers
+# from MAINTAINERS.json -> repo_maintainers[<name>], plus the global maintainers.
+# Anything else is governed by the root project and its global maintainers alone.
+GOVERNING_REPO=""
+CORE_REL="$REL_PATH"
 case "$REL_PATH" in
-  .claude/*|CLAUDE.md|scripts/*|docs/*)
+  repos/*/*)
+    GOVERNING_REPO="${REL_PATH#repos/}"
+    GOVERNING_REPO="${GOVERNING_REPO%%/*}"
+    CORE_REL="${REL_PATH#repos/${GOVERNING_REPO}/}"
+    ;;
+esac
+
+IS_CORE=false
+# .claude/* and CLAUDE.md are tracked in git and protected at runtime.
+# CORE_REL is repo-relative, so a child repo's own config is protected
+# the same way the root's is — governed by that child's maintainers.
+case "$CORE_REL" in
+  .claude/*|CLAUDE.md|AGENT.md|scripts/*|docs/*)
     IS_CORE=true
     ;;
 esac
 
 if [[ "$IS_CORE" == "true" ]]; then
-  # Check if user is a maintainer
-  IS_MAINTAINER="$(jq -r --arg email "$USER_EMAIL" '
-    (.global // []) | map(select(. == $email)) | length > 0' "$MAINTAINERS_FILE" 2>/dev/null || echo "false")"
+  # The maintainer set: global_maintainers, plus repo_maintainers[<repo>] when
+  # the path belongs to a registered child repo.
+  #
+  # This read used to be `(.global // [])`. No MAINTAINERS.json has ever had a
+  # `global` key — the schema this template ships, and the one init-wizard
+  # writes, is `global_maintainers` — so the lookup always returned [], every
+  # user resolved as a non-maintainer, and $MAINTAINER_LIST rendered empty in
+  # both messages. `repo_maintainers` was written by register-repo.sh and read
+  # by nothing at all.
+  IS_MAINTAINER="$(jq -r --arg email "$USER_EMAIL" --arg repo "$GOVERNING_REPO" '
+    def norm: ascii_downcase;
+    ((.global_maintainers // [])
+     + (if $repo == "" then [] else (.repo_maintainers[$repo] // []) end))
+    | map(norm) | index(($email | norm)) != null' "$MAINTAINERS_FILE" 2>/dev/null || echo "false")"
+
+  # An empty git user.email must never authenticate as a maintainer.
+  [[ -n "$USER_EMAIL" ]] || IS_MAINTAINER="false"
 
   if [[ "$IS_MAINTAINER" == "true" ]]; then
     if [[ -n "$CONTEXT" ]]; then hook_warn "$CONTEXT"; fi
@@ -147,19 +177,26 @@ if [[ "$IS_CORE" == "true" ]]; then
 
   # Hard-block behavioral config files for non-maintainers
   IS_HARD_BLOCK=false
-  case "$REL_PATH" in
+  case "$CORE_REL" in
     CLAUDE.md|.claude/settings.json|.claude/settings.local.json|scripts/hooks/*|.claude/agents/*)
       IS_HARD_BLOCK=true
       ;;
   esac
 
-  MAINTAINER_LIST="$(jq -r '(.global // []) | join(", ")' "$MAINTAINERS_FILE" 2>/dev/null || echo "unknown")"
+  MAINTAINER_LIST="$(jq -r --arg repo "$GOVERNING_REPO" '
+    ((.global_maintainers // [])
+     + (if $repo == "" then [] else (.repo_maintainers[$repo] // []) end))
+    | unique | join(", ")' "$MAINTAINERS_FILE" 2>/dev/null || echo "")"
+  [[ -n "$MAINTAINER_LIST" ]] || MAINTAINER_LIST="unknown"
+
+  _WHOSE="the project"
+  [[ -n "$GOVERNING_REPO" ]] && _WHOSE="child repo '$GOVERNING_REPO'"
 
   if [[ "$IS_HARD_BLOCK" == "true" ]]; then
-    hook_block "BLOCKED: $REL_PATH is a protected config file maintained by $MAINTAINER_LIST. Submit changes via PR."
+    hook_block "BLOCKED: $REL_PATH is a protected config file of $_WHOSE, maintained by $MAINTAINER_LIST. Submit changes via PR."
   fi
 
-  add_context "WARNING: You are editing a core file maintained by $MAINTAINER_LIST. Changes on session branch will be included in auto-PR at session end."
+  add_context "WARNING: You are editing a core file of $_WHOSE, maintained by $MAINTAINER_LIST. Changes on session branch will be included in auto-PR at session end."
 fi
 
 if [[ -n "$CONTEXT" ]]; then
