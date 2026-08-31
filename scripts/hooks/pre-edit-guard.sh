@@ -161,14 +161,60 @@ if [[ "$IS_CORE" == "true" ]]; then
   # user resolved as a non-maintainer, and $MAINTAINER_LIST rendered empty in
   # both messages. `repo_maintainers` was written by register-repo.sh and read
   # by nothing at all.
-  IS_MAINTAINER="$(jq -r --arg email "$USER_EMAIL" --arg repo "$GOVERNING_REPO" '
-    def norm: ascii_downcase;
+  # Resolve BOTH sides through the alias registry before comparing.
+  #
+  # The naive comparison — this machine's `git config user.email` against the
+  # raw strings in MAINTAINERS.json — fails in both directions, and both were
+  # reproduced before this was written:
+  #
+  #   Grants wrongly. git user.email is inherited from the container image, so
+  #   every collaborator in a shared devcontainer presents the same address. A
+  #   session belonging to someone else passed the maintainer check purely by
+  #   inheriting it.
+  #
+  #   Blocks wrongly. A maintainer whose commits carry a GitHub noreply address
+  #   is not the string in MAINTAINERS.json, so wiring this guard hard-blocked
+  #   the project maintainer out of scripts/hooks/ on his own machine.
+  #
+  # So: a maintainer entry that the registry has CLAIMED is matched against the
+  # session's canonical user, which comes from the one resolver in
+  # session-start.sh. An entry nobody has claimed keeps the old e-mail
+  # comparison, which is the correct day-one behaviour before anyone registers.
+  #
+  # This is not authentication. Anyone who can run `git config` or `gh auth`
+  # can present as someone else, and the guard fails open on timeout by harness
+  # design. It stops accidents and records intent. Repository permissions on
+  # the forge are the actual control.
+  hook_load_identity
+  ACTOR="$SESSION_USER"
+  if declare -F hook_canonical_user >/dev/null 2>&1; then
+    _AC="$(hook_canonical_user "$ACTOR" 2>/dev/null || echo "")"
+    [[ -n "$_AC" ]] && ACTOR="$_AC"
+  fi
+
+  IS_MAINTAINER="false"
+  while IFS= read -r _m; do
+    [[ -n "$_m" ]] || continue
+    _owner=""
+    if declare -F hook_identity_owner >/dev/null 2>&1; then
+      _owner="$(hook_identity_owner "$_m" 2>/dev/null || echo "")"
+    fi
+    if [[ -n "$_owner" ]]; then
+      # Claimed: only that person qualifies, whichever e-mail they commit with.
+      if [[ "${ACTOR,,}" == "${_owner,,}" && "$ACTOR" != "unknown" ]]; then
+        IS_MAINTAINER="true"; break
+      fi
+    else
+      # Unclaimed: fall back to the e-mail comparison.
+      if [[ -n "$USER_EMAIL" && "${USER_EMAIL,,}" == "${_m,,}" ]]; then
+        IS_MAINTAINER="true"; break
+      fi
+    fi
+  done < <(jq -r --arg repo "$GOVERNING_REPO" '
     ((.global_maintainers // [])
      + (if $repo == "" then [] else (.repo_maintainers[$repo] // []) end))
-    | map(norm) | index(($email | norm)) != null' "$MAINTAINERS_FILE" 2>/dev/null || echo "false")"
+    | unique | .[]' "$MAINTAINERS_FILE" 2>/dev/null || true)
 
-  # An empty git user.email must never authenticate as a maintainer.
-  [[ -n "$USER_EMAIL" ]] || IS_MAINTAINER="false"
 
   if [[ "$IS_MAINTAINER" == "true" ]]; then
     if [[ -n "$CONTEXT" ]]; then hook_warn "$CONTEXT"; fi

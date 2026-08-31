@@ -3,7 +3,7 @@
 # Locked roots: scripts/hooks scripts/validate
 # Excluded:     scripts/hooks/lib/tools.lock
 #
-# Regenerated: 2026-08-31T18:25:53Z
+# Regenerated: 2026-08-31T19:31:06Z
 # By:          scripts/validate/update_hooks_lock.sh
 #
 # A drifted lock means a hook or validator changed since last review.
@@ -20,7 +20,7 @@ cba520e5702bc498ce55551318a4a6efdd8a86a470cc962097fb735e52d75882  scripts/hooks/
 920b10c6f8abfafb2d2d035d82751288fcd97cf98ec580cb4834ae1b0a537ebc  scripts/hooks/correction-detection.sh
 eb2402d48c30f8fcc3e0b4beeaf1cc0c4ed76bacc1c85f913b7e7e3d3bcf6a16  scripts/hooks/knowledge-metabolism-check.sh
 b89a7c41c5e0e71ac3d7636552b09d5b20effc8a1746fce63d4dd1e571acec8d  scripts/hooks/lib/hook-utils.sh
-1f52a9ba5c1c871f7620ae4a5405934536a9c5562f37ebaa87cea72077362713  scripts/hooks/lib/identity.sh
+c777cc7f200f803b3426efd0d7f5c8fd4c9071b7b54c12fd6d2b276ba0fef396  scripts/hooks/lib/identity.sh
 99ba76721471b864168439849a552f1b19a10a036820dc9d6d4aa72fa08d4871  scripts/hooks/lib/log-repo.sh
 f65b7ec57686cecedf42178975e2d247a7aa32f236828fb5b9fbb7d233789b97  scripts/hooks/lib/path-forms.sh
 b86df61cd55cffbf8325431aa7dbdb854217fc64ff2c3187267681412e6fb386  scripts/hooks/lib/secret-patterns.txt
@@ -29,12 +29,13 @@ b86df61cd55cffbf8325431aa7dbdb854217fc64ff2c3187267681412e6fb386  scripts/hooks/
 8b43a6229ec7c7e0aaabf3c3d5af3142e5336088316908e7cae7267e0e58ff6f  scripts/hooks/lib/tools.lock.example
 6dc21d3990693c6acc888904cb04baa4fb215a1bba1a521a1298dc888acfeec7  scripts/hooks/post-edit-check.sh
 798d059e276495d8b3e8d65b432f83472888dd30d155f300d1d5a00b78381536  scripts/hooks/post-tool-use-audit.sh
-7a546da546f95c783c67c81e49cd711c56ee1fe1b10fc4eb8fc7354c4531fb02  scripts/hooks/pre-edit-guard.sh
+79b1b5282b861d038c0c2c9483c0dde0de4dc412d5bb146212d440a2b6a9baf2  scripts/hooks/pre-edit-guard.sh
 708376e1f25831574bc98fd227cc4b2c1573b4058334a40df2f26a1699ed92f0  scripts/hooks/session-end.sh
 30faf5c64aa5a288ab19e515273b5b3e20750a0061d556142cf495ed24b6364f  scripts/hooks/session-start.sh
 7b32cb4e819703061cdf11286c576183273ed2df09db0953c7bc21df86f6a945  scripts/hooks/skill_usage_log.sh
 5eddfc5b264b659736bbe81e5be064c85ec9be7a0446c2636b3d284cb21749f6  scripts/hooks/subagent-start.sh
 4196250b463fc7f48fd7a53f2733c127a3000994dcf41abfa267c8fc91f53aae  scripts/hooks/tests/test_clone_destination.sh
+7782ce0905f9284e91d4e286ab59549ca49b74af7d0d41b661ed154bf33e657b  scripts/hooks/tests/test_maintainer_resolution.sh
 1fac064d3eb0cf107cc713566f32951542eb24e4a9dd6eb768f3cc94b975c015  scripts/hooks/tests/test_root_write_isolation.sh
 1837b9050055e6a5fbd8f68e30a7e33a19b790ba7ff101539697a8a3e1f6ca7a  scripts/hooks/tests/test_session_end_logging.sh
 a42a9e0257030f5dcf2a01bbe3a159b1556bd8cc2c2dcd35f98c15d6cdc3a45c  scripts/hooks/wiki-recall.sh

@@ -77,6 +77,35 @@ hook_canonical_user() {
   fi
 }
 
+# --- Who owns an identity string? ---
+# Usage: hook_identity_owner <string>
+# Echoes the canonical user that has claimed this string (as its canonical name
+# or as one of its aliases), or NOTHING when no one has. Unlike
+# hook_canonical_user, which echoes its input back when unresolved, this
+# distinguishes "registered to <person>" from "not registered at all" — which is
+# the distinction the maintainer check needs, because the two cases have to be
+# handled differently.
+hook_identity_owner() {
+  local raw="${1:-}"
+  [[ -n "$raw" ]] || { echo ""; return 0; }
+
+  hook_resolve_log_repo 2>/dev/null || { echo ""; return 0; }
+  local registry="${LOG_REPO_DIR:-}/identities.json"
+  [[ -f "$registry" ]] || { echo ""; return 0; }
+  command -v jq >/dev/null 2>&1 || { echo ""; return 0; }
+
+  jq -r --arg raw "$raw" '
+    def norm: ascii_downcase | gsub("[^a-z0-9_@.-]"; "");
+    ($raw | norm) as $me
+    | [ .users[]?
+        | select(
+            (([.canonical // ""] + (.aliases // [])) | map(norm) | index($me) != null)
+          )
+        | .canonical ]
+    | if length == 1 then .[0] else "" end
+  ' "$registry" 2>/dev/null || echo ""
+}
+
 # --- Warn when a user looks unregistered and ambiguous ---
 # Usage: hook_identity_warning <resolved-name>
 # Echoes a warning string (or nothing). Only fires when the person is NOT in the
