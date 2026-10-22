@@ -21,7 +21,8 @@ Umbrella repository for cross-repo coordination and governance. No application c
 ## Governance
 
 - **Hooks**: `scripts/hooks/` — security gates, audit logging, filesystem safety, schema validation
-- **Secrets**: `secrets/` — protected paths (contents gitignored, never readable by agents)
+- **Secrets**: `docs/guides/secrets-policy.md` — Tier-1 credentials come from a keystore at runtime, never from a plaintext file; agents never read, echo or re-export a value. `secrets/` is a protected path (contents gitignored, never readable by agents), not a keystore
+- **Rotation**: `docs/rotation-register.json` — inventory of every Tier-1/2 credential and temporary grant; `scripts/validate/validate_rotation_register.py` fails on an overdue rotation or an expired grant
 - **Logging**: `scripts/utils/agent_log.sh` — append-only audit trail
 - **Validators**: `scripts/validate/` — structural integrity checks (agents, documents, skills, hooks)
 

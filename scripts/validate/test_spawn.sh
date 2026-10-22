@@ -161,6 +161,72 @@ for t in scripts/hooks/tests/*.sh; do
     else bad "$(basename "$t")" "hook test fails in a fresh project"; fi
 done
 
+# --- Secrets policy ------------------------------------------------------
+# The policy is only real if a fresh project ships it AND its two checks can
+# fail. Each check is run on one clean input and on inputs it must reject;
+# a check that passes everything would pass here too, so the reject cases are
+# the point. Fixture tokens are assembled at runtime so no scanner sees a
+# credential-shaped literal in this file.
+[[ -f docs/guides/secrets-policy.md ]] && ok "secrets policy shipped" \
+                                       || bad "secrets policy shipped" "docs/guides/secrets-policy.md missing"
+RREG=docs/rotation-register.json
+RVAL=scripts/validate/validate_rotation_register.py
+if [[ -f "$RREG" ]] && jq -e '(.credentials|length)==0 and (.temporary_grants|length)==0' "$RREG" >/dev/null 2>&1; then
+    ok "rotation register shipped empty"
+else bad "rotation register shipped empty" "missing, invalid, or carries the archetype's entries"; fi
+
+SFX="$SANDBOX/secrets-fixtures"; mkdir -p "$SFX"
+python3 - "$SFX" "$RREG" <<'PY' 2>/dev/null
+import copy, json, sys
+d, base = sys.argv[1], json.load(open(sys.argv[2]))
+cred = {"id": "DEPLOY_TOKEN", "tier": 1, "owner": "ci", "store": "op://v/DEPLOY_TOKEN/credential",
+        "consumers": ["ci"], "copies": [], "rotation_days": 90, "last_rotated": "2026-09-01",
+        "procedure": "docs/x.md"}
+grant = {"id": "tmp", "owner": "ci", "scope": "one host", "granted": "2026-10-01", "expires": "2026-10-20"}
+def w(name, creds=(), grants=()):
+    r = copy.deepcopy(base); r["credentials"] = list(creds); r["temporary_grants"] = list(grants)
+    json.dump(r, open("%s/%s.json" % (d, name), "w"))
+w("clean", [cred], [grant])
+w("overdue", [dict(cred, last_rotated="2026-06-01")])
+w("too-long", [dict(cred, rotation_days=365)])
+w("url-store", [dict(cred, store="https://rpc.example/v2/k")])
+w("value", [dict(cred, consumers=["ghp_" + "a" * 36])])
+w("grant-noexp", [], [dict(grant, expires="")])
+PY
+if python3 "$RVAL" --register "$SFX/clean.json" --today 2026-10-15 >/dev/null 2>&1; then
+    ok "rotation validator accepts a current register"
+else bad "rotation validator accepts a current register" "rejected a clean entry"; fi
+# "Rejects" means exit 1 exactly: a missing or crashing script exits 2/127
+# and must not count as a rejection.
+rejects() { "$@" >/dev/null 2>&1; [[ $? -eq 1 ]]; }
+for c in overdue too-long url-store value grant-noexp; do
+    if rejects python3 "$RVAL" --register "$SFX/$c.json" --today 2026-10-15; then
+        ok "rotation validator rejects: $c"
+    else bad "rotation validator rejects: $c" "did not exit 1 on a register it must fail"; fi
+done
+if rejects python3 "$RVAL" --register "$SFX/clean.json" --today 2026-10-21; then
+    ok "rotation validator rejects: expired grant"
+else bad "rotation validator rejects: expired grant" "did not exit 1 after the grant expired"; fi
+
+CHK=scripts/utils/check_secret_refs.sh
+printf 'DEPLOY_TOKEN=op://vault/DEPLOY_TOKEN/credential\nLOG_LEVEL=info\n' > "$SFX/refs-ok.env"
+printf 'API_TOKEN=literalvalue\n'                      > "$SFX/refs-literal.env"
+printf 'X=%s\n' "ghp_$(printf 'b%.0s' {1..36})"        > "$SFX/refs-pattern.env"
+printf 'TOK=op://vault/My Item (rw)/password\n'        > "$SFX/refs-malformed.env"
+printf 'TOK=op://vault/item/password\n'                > "$SFX/refs-unresolved.env"
+if bash "$CHK" "$SFX/refs-ok.env" >/dev/null 2>&1; then ok "ref checker accepts a reference-only file"
+else bad "ref checker accepts a reference-only file" "rejected clean input"; fi
+for c in literal pattern malformed; do
+    if rejects bash "$CHK" "$SFX/refs-$c.env"; then ok "ref checker rejects: $c"
+    else bad "ref checker rejects: $c" "did not exit 1 on a file it must fail"; fi
+done
+if rejects bash "$CHK" --resolved "$SFX/refs-unresolved.env"; then
+    ok "ref checker --resolved rejects a leftover reference"
+else bad "ref checker --resolved rejects a leftover reference" "did not exit 1"; fi
+if bash "$CHK" "$SFX/refs-literal.env" "$SFX/refs-pattern.env" 2>&1 | grep -qE 'literalvalue|ghp_b'; then
+    bad "ref checker never prints a value" "a value appeared in its output"
+else ok "ref checker never prints a value"; fi
+
 # --- Day-one paths -------------------------------------------------------
 # These are the paths least likely to be exercised before release: empty
 # directories, zero counters, no notes yet.

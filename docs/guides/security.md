@@ -16,6 +16,7 @@ make accidental and adversarial misbehavior visible, bounded, and reversible.
 | A fork or in-place edit silently disables a gate hook | Hook drift detection (`HOOKS.lock`) |
 | Reviewing a session start without running it | Dry-run / argv mode |
 | Loss of forensic trail | Append-only audit log |
+| Plaintext credentials at rest; keys that never rotate; grants that never expire | Keystore policy + rotation register (`secrets-policy.md`, `validate_rotation_register.py`) |
 | Runaway test commands consuming the box | Bounded test safety hook |
 | Cross-session state collision between users | Per-user log scoping + session branches |
 
@@ -26,9 +27,11 @@ make accidental and adversarial misbehavior visible, bounded, and reversible.
 - **Kernel sandboxing**: filesystem/network sandboxing at the kernel level
   (firejail, bubblewrap, landlock) is per-deployment and not opinionated here.
   Layer it on top.
-- **OS keychain integration**: heterogeneous on Linux. Use `secrets/` (with the
-  read-block hook) as the abstract boundary; bind to libsecret/pass/age in
-  child repos as needed.
+- **Choice of keystore product**: heterogeneous across teams and OSes. The
+  archetype sets the *rules* — Tier-1 values come from a keystore at runtime,
+  references at rest, a rotation register — in
+  [`secrets-policy.md`](secrets-policy.md), and leaves the product (1Password,
+  sops+age, pass, Vault, a cloud manager) to each project.
 
 ## Defense Layers
 
@@ -163,6 +166,21 @@ structurally impossible: one agent cannot accidentally overwrite another
 user's notes because the path is namespaced by the hook before the agent ever
 sees it.
 
+### 12. Keystore Policy and Rotation Register
+
+**Why**: the read hook keeps an agent out of `secrets/`, but a plaintext key
+on disk still leaks through backups, images and other processes. And a key
+that nobody tracks never rotates.
+
+**How**: [`secrets-policy.md`](secrets-policy.md) sets the tiers and the
+injection model (references at rest, values resolved per exec).
+`docs/rotation-register.json` lists every Tier-1/2 credential and temporary
+grant with owner, copies, and last rotation.
+`scripts/validate/validate_rotation_register.py` fails on an overdue rotation,
+an expired grant, or a value pasted into the register.
+`scripts/utils/check_secret_refs.sh` fails a reference file that holds a
+literal credential.
+
 ## Setup Checklist (per fresh clone)
 
 ```bash
@@ -189,6 +207,10 @@ bash scripts/validate/validate_hooks_lock.sh
 | Adopting a fork or merging a PR that touches hooks | Run `validate_hooks_lock.sh` before trusting it |
 | Adding a new external tool to a hook | Add to `tools.lock.example`, re-run `tools-init.sh`, commit example |
 | Suspect compromise | `validate_hooks_lock.sh --diff` + `git log scripts/hooks/ scripts/validate/` |
+| New credential or temporary grant | Add it to `docs/rotation-register.json` in the same change |
+| Credential rotated | Follow `secrets-policy.md` §6.3, then update `last_rotated` |
+| Value went through a session, chat or shell history | Rotate now (`secrets-policy.md` §6.2) |
+| Register validator fails | Rotate the credential or revoke the grant — do not move the date |
 
 ## Provenance
 
@@ -196,5 +218,5 @@ The pinned-tools / explicit-secret-release / kernel-sandbox / verify-then-trust
 model is adapted from the agent-stack hardening pattern described in
 [learntoprompt.org / agent-stack](https://learntoprompt.org/guides/agent-stack.html).
 Root-archetype implements the portable subset (tool pinning, drift detection,
-dry-run verification) and leaves kernel sandboxing and OS keychain integration
+dry-run verification) and leaves kernel sandboxing and the choice of keystore product
 as per-deployment concerns.

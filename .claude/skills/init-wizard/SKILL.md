@@ -55,6 +55,13 @@ Guided project initialization wizard for new archetype instances.
 - Confirm global maintainer email(s) (pre-filled from auto-detection)
 - Finalize `MAINTAINERS.json` with global + per-repo entries
 - Optionally set protected paths in `secrets/.secretpaths`
+- Secrets backend: ask which keystore the team uses (1Password, sops+age,
+  pass, Vault, a cloud manager, or "not yet"). Do not recommend plaintext
+  files for Tier-1 credentials. Point to `docs/guides/secrets-policy.md`
+- Rotation register: ask for the project's existing Tier-1/2 credentials and
+  live temporary grants, then add entries (metadata and references only, never
+  values) to `docs/rotation-register.json`. Run
+  `python3 scripts/validate/validate_rotation_register.py`
 
 ### Step 6: Choose hooks
 
