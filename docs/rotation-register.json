@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "_doc": "Credential inventory and rotation clock. References and metadata only, never a value. Format and rules: docs/guides/secrets-policy.md. Checked by scripts/validate/validate_rotation_register.py.",
+  "policy": {
+    "max_rotation_days": {"1": 90, "2": 180},
+    "max_grant_days": 30,
+    "due_soon_days": 14
+  },
+  "credentials": [],
+  "temporary_grants": []
+}

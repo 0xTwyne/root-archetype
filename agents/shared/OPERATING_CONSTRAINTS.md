@@ -28,6 +28,21 @@ If a child repo needs a scratch clone, put it at `tmp/<repo>-<purpose>/`. Work
 that should outlive the session belongs on a branch of the repo it came from,
 pushed the same session.
 
+## Credentials
+
+Full policy: `docs/guides/secrets-policy.md`. The hard rules:
+
+- Never read, echo, quote, log or summarize a credential value, even one the
+  operator just pasted. Acknowledge it without the value and advise rotation.
+- Never read a secret in one process and `export` it into a shell, child
+  process or subagent. Wrap the consuming command with the keystore instead.
+- Never propose plaintext storage (`.env`, `secrets/`, shell profiles) for a
+  Tier-1 credential. If the tier is unclear, ask.
+- A new credential or temporary grant gets an entry in
+  `docs/rotation-register.json` in the same change. A grant has an expiry.
+- When the register validator fails, the fix is to rotate or revoke — never
+  to move a date.
+
 ## Test Safety
 
 - Never run tests with unbounded parallelism (e.g., `pytest -n auto` on high-core machines)

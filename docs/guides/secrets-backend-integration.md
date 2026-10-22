@@ -1,41 +1,71 @@
 # Secrets Backend Integration Guide
 
-How to manage secrets in a root-archetype instance. Covers the default `.env` approach and optional upgrade paths including Infisical.
+How to choose and wire a secrets backend for a root-archetype instance. The rules (tiers, injection, rotation) are in [`secrets-policy.md`](secrets-policy.md); this guide covers the backend options, with Infisical in detail.
 
-## Default: `.env` + Hook Protection
+## The Rule First
 
-Every root-archetype instance ships with file-based secrets management:
+The policy is in [`secrets-policy.md`](secrets-policy.md). In short:
+
+- **Tier-1** credentials (signing keys, write-scope tokens) come from a
+  keystore at runtime. They are **never** stored in plaintext, gitignored or not.
+- **Tier-2** credentials (read-only scope) should come from a keystore.
+  A gitignored plaintext file is acceptable for read-only scope only.
+- **Tier-3** values are config and can live anywhere.
+- Every Tier-1/2 credential has an entry in `docs/rotation-register.json`.
+
+This guide is about **which backend** holds the values and how to wire it. It
+does not change those rules.
+
+## What Ships With Every Instance
 
 | Component | Path | Purpose |
 |-----------|------|---------|
-| Secret store | `secrets/` | Gitignored directory for credential files |
+| Protected directory | `secrets/` | Gitignored. For encrypted bundles (sops/age) and Tier-2/3 files only |
 | Path protection | `secrets/.secretpaths` | Glob patterns blocking agent reads |
 | Hook enforcement | `scripts/hooks/check_secrets_read.sh` | Pre-tool-use hook that blocks access to protected paths |
-| Commit scanning | `safe-commit` skill | Pattern-based detection of leaked credentials |
+| Commit scanning | `safe-commit` skill, `scripts/githooks/pre-commit` | Pattern-based detection of leaked credentials |
+| Reference check | `scripts/utils/check_secret_refs.sh` | Fails a reference file that holds a literal credential or a malformed reference |
+| Rotation register | `docs/rotation-register.json` + `scripts/validate/validate_rotation_register.py` | Inventory and rotation clock; fails CI on an overdue rotation or an expired grant |
 
-**This is sufficient when**: you're a solo operator, secrets are few (<20 values), rotation is manual and infrequent, and there's no team sharing credentials.
+The read hook stops an **agent** from reading `secrets/`. It does not protect
+the file from backups, images, tarballs, or other processes. So `secrets/` is
+not a keystore, and it is not a place for Tier-1 values.
 
-### Usage
+## Choosing a Backend
+
+| Situation | Suggested backend |
+|-----------|-------------------|
+| Small team, people already use a password manager | 1Password CLI (`op run`, `op inject`) |
+| Want secrets encrypted in git, no service | sops + age (`sops exec-env`) |
+| Solo, Linux, GPG already set up | `pass` |
+| Many repos and CI systems, want audit and dynamic credentials | Infisical or HashiCorp Vault |
+| Everything already runs in one cloud | That cloud's secrets manager |
+
+Whatever the backend, the wiring is the same pattern
+([`secrets-policy.md`](secrets-policy.md) §3): references at rest, resolve at
+exec time, the value lives only in the consuming process.
+
+### Example: 1Password CLI
 
 ```bash
-# Store secrets
-echo "ANTHROPIC_API_KEY=sk-ant-..." > secrets/.env
+# Reference file (no values) — check it, then use it
+cat > "$HOME/.config/<project>/secret-refs.env" <<'EOF'
+DEPLOY_TOKEN=op://<vault>/DEPLOY_TOKEN/credential
+EOF
+chmod 600 "$HOME/.config/<project>/secret-refs.env"
+bash scripts/utils/check_secret_refs.sh "$HOME/.config/<project>/secret-refs.env"
 
-# Reference from scripts
-source secrets/.env
-
-# Agent access is blocked automatically by the hook
+# Run one command with the values resolved
+op run --env-file="$HOME/.config/<project>/secret-refs.env" -- <command>
 ```
 
-## When to Upgrade
+### Example: sops + age
 
-Consider a dedicated secrets backend when any of these apply:
-
-- **Team access**: Multiple people or CI systems need the same credentials
-- **Rotation pressure**: API keys expire or must rotate on a schedule
-- **Audit requirements**: You need a log of who accessed which secret and when
-- **Dynamic credentials**: You want short-lived database credentials generated on demand
-- **Multi-repo**: Several child repos registered under this root share credentials
+```bash
+# Encrypted file can be committed; the age private key stays outside the repo
+sops --encrypt --age <recipient> secrets.env > secrets.enc.env
+sops exec-env secrets.enc.env '<command>'
+```
 
 ## Option: Infisical (Self-Hosted or Cloud)
 
@@ -84,7 +114,11 @@ export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
 
 The integration point is `secrets/` — replace static files with Infisical CLI calls.
 
-**Option A: Wrapper script** (recommended for simplicity)
+**Option A: Wrapper script** — Tier-2/3 only
+
+> **Warning:** This loads every value into the session environment, and every
+> child process inherits it — an agent session included. Do not use it for
+> Tier-1 credentials. Use Option B for those.
 
 Create `scripts/utils/load_secrets.sh`:
 
@@ -110,7 +144,7 @@ else
 fi
 ```
 
-**Option B: Run commands with injected env** (no script changes needed)
+**Option B: Run commands with injected env** (recommended; no script changes needed)
 
 ```bash
 # Any command gets secrets injected automatically
@@ -125,7 +159,8 @@ Regardless of backend, these remain unchanged:
 - **`.secretpaths`** — still blocks agent reads (agents never touch Infisical directly)
 - **`check_secrets_read.sh`** — still enforces path protection
 - **`safe-commit`** — still scans for leaked patterns in staged diffs
-- **`secrets/` directory** — still exists as fallback and for any values not in Infisical
+- **`secrets/` directory** — still exists for encrypted bundles and Tier-2/3 values
+- **`docs/rotation-register.json`** — still the inventory; `store` points at the Infisical path
 
 ### Init-Wizard Integration (Future)
 

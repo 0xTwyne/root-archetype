@@ -146,6 +146,8 @@ agent-safety baseline before customization. Full reference:
 | **Dry-run / argv mode** | Print the launch chain (paths, env, tools, planned writes) without side effects | `session-start.sh --argv`, `session_init.sh --argv` |
 | **Append-only audit trail** | Every tool call logged | `scripts/hooks/post-tool-use-audit.sh` + `scripts/utils/agent_log.sh` (default-on) |
 | **Bounded test execution** | Caps for parallelism/timeouts on agent-issued test runs | `scripts/hooks/check_test_safety.sh` |
+| **Keystore policy** | Tier-1 values from a keystore at runtime; references at rest; per-exec resolution | `docs/guides/secrets-policy.md` + `scripts/utils/check_secret_refs.sh` |
+| **Rotation register** | Inventory of credentials and temporary grants; overdue rotation or expired grant fails CI | `docs/rotation-register.json` + `scripts/validate/validate_rotation_register.py` |
 | **Schema/structure invariants** | Agent role + skill + doc-drift validators | `scripts/validate/*.py` |
 | **Session isolation** | Each session runs on its own branch; identity persisted to `.session-identity` | `scripts/hooks/session-start.sh` |
 | **Per-user log/notes scoping** | Cross-session writes routed under `notes/<user>/`, `logs/progress/<user>/` | `lib/log-repo.sh`, `hook_ensure_log_dirs` |
@@ -274,6 +276,7 @@ python3 scripts/validate/validate_agents_structure.py    # Role file schema
 python3 scripts/validate/validate_document_drift.py      # Structural integrity
 python3 scripts/validate/validate_claude_md_consistency.py  # Instruction file refs
 python3 scripts/validate/validate_skills.py              # Skill standards
+python3 scripts/validate/validate_rotation_register.py   # Credential rotation clock
 ```
 
 ## License

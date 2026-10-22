@@ -62,6 +62,11 @@ guards in `scripts/hooks/` do not run here. The engine-agnostic layer does:
   diffs. Applies to every git client, including Codex sessions.
 - **CI backstop** (`.github/workflows/protected-paths.yml`): fails any push
   that adds protected files, even if local hooks were bypassed.
+- **Secrets policy** (`docs/guides/secrets-policy.md`): applies to Codex in
+  full. No guard hook reads your intent, so the rules are yours to keep: never
+  read, echo or re-export a credential value; Tier-1 values come from a
+  keystore at runtime; register every new credential or temporary grant in
+  `docs/rotation-register.json`.
 
 The session lifecycle (branching, end-of-session commit/push, log push) is
 covered by the scripts in the "Session lifecycle" section above — run them at
